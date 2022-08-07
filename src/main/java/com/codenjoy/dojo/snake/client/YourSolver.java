@@ -74,17 +74,16 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("сработало: if (this.path.size() > 1) и заходим в getDirection ");
 
 
-
-                if(this.path.size() < 35)
-                {
-                    dir = getDirection(this.board, this.path);  // и передали path в модуль получения Direction
+                int snakeSizeLimit = 5;
+                if (board.getSnake().size() < snakeSizeLimit) {
+                    // и передали path в модуль получения Direction
+                    Point nextStep = getDirection(this.board, this.path);
+                    dir = finalizeDirection(nextStep);
                     System.out.println("получили в getDirection dir= " + dir + "и вышли в .get()");
+                } else {
+                    Point nextStep = getStickyDirection(this.board, this.path);
+                    dir = finalizeDirection(nextStep);
                 }
-                else {
-                    dir = getStickyDirection(this.board, this.path);
-                }
-
-
 
 
             } else
@@ -94,11 +93,9 @@ public class YourSolver implements Solver<Board> {
                 this.graph = createGraph(board, true);
                 destination = new Dijkstra.Vertex(board.getStones().get(0));
                 this.path = getPath(destination);
-                dir = getDirection(board, this.path);
+                Point nextStep = getDirection(board, this.path);
+                dir = finalizeDirection(nextStep);
             }
-
-            // TODO прописать алгоритм прохода к яблоку по единственному пути- узкому тоннелю, когда на пути к яблоку есть камень,
-            // TODO чтобы шла на камень, сьедала, но доходила до яблока.
 
             // Eсли не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
             if (path.size() < 2 || dir == null) {
@@ -187,39 +184,51 @@ public class YourSolver implements Solver<Board> {
         return Dijkstra.buildPath(destination);
     }
 
-    public static String getDirection(Board board, LinkedList<Point> path) {
+    public static Point getDirection(Board board, LinkedList<Point> path) {
         System.out.println("in getDirection");
         System.out.println("path: " + path);
-        Point head = board.getHead();
-
-        String dir = null;
-        Point nextStep = path.get(1); // TODO:  тут раньше получали NullPointerException
-        System.out.println("nextStep: " + nextStep);
-        System.out.println("head: " + head);
-        if (nextStep.getX() > head.getX()
-                && nextStep.getY() == head.getY()) {
-            dir = Direction.RIGHT.toString();
-        } else if (nextStep.getX() < head.getX()
-                && nextStep.getY() == head.getY()) {
-            dir = Direction.LEFT.toString();
-        } else if (nextStep.getY() > head.getY()
-                && nextStep.getX() == head.getX()) {
-            dir = Direction.UP.toString();
-        } else if (nextStep.getY() < head.getY()
-                && nextStep.getX() == head.getX()) {
-            dir = Direction.DOWN.toString();
-        }
-        return dir;
-    }
-
-    public static String getStickyDirection(Board board, LinkedList<Point> path){
-        System.out.println("in getStickyDirection");
         Point head = board.getHead();
 
         String dir = null;
         Point nextStep = path.get(1);
         System.out.println("nextStep: " + nextStep);
         System.out.println("head: " + head);
+
+        return nextStep;
+    }
+
+    public static Point getStickyDirection(Board board, LinkedList<Point> path) {
+        System.out.println("in getStickyDirection");
+        Point head = board.getHead();
+        Point nextStep = null;
+        System.out.println("head: " + head);
+        String dir = null;
+
+        int leftEndpoint = 1;
+        int rightEndpoint = 2;
+
+        if (board.isNear(head, Elements.GOOD_APPLE)) {
+            nextStep = path.get(1);
+        }
+
+        if (board.isAt(head.getX() - leftEndpoint, head.getY(), Elements.NONE)
+                && head.getX() > rightEndpoint
+        ) {
+            nextStep = new PointImpl(head.getX() - 1, head.getY());
+        } else if (board.isAt(head.getX() + 1, head.getY(), Elements.NONE)
+                && head.getX() < board.size() - 3
+        ) {
+            nextStep = new PointImpl(head.getX() + 1, head.getY());
+        } else {
+            nextStep = path.get(1);
+        }
+
+        return nextStep;
+    }
+
+    public String finalizeDirection(Point nextStep) {
+        Point head = this.board.getHead();
+        String dir = null;
         if (nextStep.getX() > head.getX()
                 && nextStep.getY() == head.getY()) {
             dir = Direction.RIGHT.toString();
@@ -235,6 +244,7 @@ public class YourSolver implements Solver<Board> {
         }
         return dir;
     }
+
 
     public static void main(String[] args) {
         WebSocketRunner.runClient(

@@ -21,7 +21,8 @@ public class YourSolver implements Solver<Board> {
     private Dice dice;
     private Board board;
 
-    private List<Dijkstra.Vertex> graph;
+    private List<Dijkstra.Vertex> graph = null;
+    private LinkedList<Point> path = new LinkedList<>();
 
     public YourSolver(Dice dice) {
         this.dice = dice;
@@ -45,48 +46,121 @@ public class YourSolver implements Solver<Board> {
 //        if(head == null){return Direction.UP.toString();}
 
 
-        try{
-            List<Point> freeSpace = board.get(Elements.NONE, Elements.GOOD_APPLE);
-            freeSpace.add(head);
-            this.graph = freeSpace.stream().map(Dijkstra.Vertex::new).collect(Collectors.toList());
-
-            this.graph.forEach((v) -> setEdges.accept(v));
-
+        try {
+            this.graph = createGraph(this.board, Elements.GOOD_APPLE);
 
             System.out.println("тестируем код");
-            graph.stream().filter(
+
+            // находим в графе Vertex головы змеи и (если найдена) - отправляем её в качестве source для просчета Дейкстры
+            this.graph.stream().filter(
                             (v) -> (v.point.getX() == head.getX() && v.point.getY() == head.getY()))
                     .findFirst().ifPresent(Dijkstra::computeGraph);
 
 
-            Dijkstra.Vertex destination = graph.stream().filter(
+            // Направляемся к яблоку.   Сначала получим из графа Vertex яблока и присвоим его в destination
+            Dijkstra.Vertex destination = this.graph.stream().filter(
                             (v) -> (v.point.getX() == apple.getX() && v.point.getY() == apple.getY()))
                     .findFirst().orElse(null);
 
-//--------------------------------------
+            //  получили под destination искомый path
+            this.path = getPath(destination);
+            String dir = null;
 
-            LinkedList<Point> path = new LinkedList<>();
-            String dir = getDirection(board, graph, destination, path);
-            if (path.size() == 0) {
-                // TODO  добавить rock в graph , destination = Vertex(rock)) и снова ныряем в String dir = getDirection(board, graph, destination, path);
+            if (this.path.size() > 0) {
+                dir = getDirection(this.board, this.path);  // и передали path в модуль получения Direction
+            } else
+            // Если не найден путь к яблоку - направляемся к камню. Для этого нужно переформировать graph вставив туда камень вместо яблока
+            {
+                System.out.println("!!! path not found. Snakes heads out toward a stone!");
+                this.graph = createGraph(board, Elements.BAD_APPLE);
+                destination = new Dijkstra.Vertex(board.getStones().get(0));
+                this.path = getPath(destination);
+                dir = getDirection(board, this.path);
             }
+
+
+            // Eсли не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
+/*            if (path.size() == 0) {
+                if (board.isAt(head.getX() - 1, head.getY(), Elements.NONE)) {
+                    dir = Direction.LEFT.toString();
+                } else if (board.isAt(head.getX() + 1, head.getY(), Elements.NONE)) {
+                    dir = Direction.RIGHT.toString();
+                } else if (board.isAt(head.getX(), head.getY() - 1, Elements.NONE)) {
+                    dir = Direction.DOWN.toString();
+                } else {
+                    dir = Direction.UP.toString();
+                }
+            }*/
+            System.out.println("direction before quitting:  " + dir);
             return dir;
 
 
-
-
-        }catch (Exception e){
+        } catch (Exception e) {
             System.out.println("общее исключение .get()");
+            return Direction.DOWN.toString();
         }
-        return Direction.UP.toString();
     }
 
 
-    public static String getDirection(Board board, List<Dijkstra.Vertex> graph, Dijkstra.Vertex destination, LinkedList<Point> path){
+    public List<Dijkstra.Vertex> createGraph(Board board, Elements target) {
+        List<Dijkstra.Vertex> graph;
+
+        List<Point> freeSpace = board.get(Elements.NONE, target);
+        freeSpace.add(board.getHead());
+        graph = freeSpace.stream().map(Dijkstra.Vertex::new).collect(Collectors.toList());
+
+        Consumer<Dijkstra.Vertex> setEdges = (v) -> {
+            Point p = v.point;
+            Point up = new PointImpl(p.getX(), p.getY() + 1);
+            Point down = new PointImpl(p.getX(), p.getY() - 1);
+            Point left = new PointImpl(p.getX() - 1, p.getY());
+            Point right = new PointImpl(p.getX() + 1, p.getY());
+
+
+            if (board.isAt(up, Elements.NONE) || board.isAt(up, Elements.GOOD_APPLE)) {
+                graph.stream().filter((c) ->
+                        c.point.equals(up)
+                ).findFirst().ifPresent((vUp) -> v.edges.add(new Dijkstra.Edge(vUp, 1)));
+            }
+
+
+            if (board.isAt(down, Elements.NONE) || board.isAt(down, Elements.GOOD_APPLE)) {
+                graph.stream().filter((c) ->
+                        c.point.equals(down)
+                ).findFirst().ifPresent((vDown) -> v.edges.add(new Dijkstra.Edge(vDown, 1)));
+
+            }
+
+
+            if (board.isAt(left, Elements.NONE) || board.isAt(left, Elements.GOOD_APPLE)) {
+                graph.stream().filter((c) ->
+                        c.point.equals(left)
+                ).findFirst().ifPresent((vLeft) -> v.edges.add(new Dijkstra.Edge(vLeft, 1)));
+
+            }
+
+
+            if (board.isAt(right, Elements.NONE) || board.isAt(right, Elements.GOOD_APPLE)) {
+                graph.stream().filter((c) ->
+                        c.point.equals(right)
+                ).findFirst().ifPresent(vRight -> v.edges.add(new Dijkstra.Edge(vRight, 1)));
+            }
+        };
+
+        graph.forEach((v) -> setEdges.accept(v));
+//        System.out.println("new graph is: " + graph);
+        return graph;
+
+    }
+
+    public LinkedList<Point> getPath(Dijkstra.Vertex destination) {
+        return Dijkstra.buildPath(destination);
+    }
+
+    public static String getDirection(Board board, LinkedList<Point> path) {
         Point head = board.getHead();
 
         String dir = null;
-        path = Dijkstra.buildPath(destination);
         Point nextStep;
         if (path.size() > 1) {
             nextStep = path.get(1);
@@ -111,45 +185,6 @@ public class YourSolver implements Solver<Board> {
         }
         return dir;
     }
-
-
-    Consumer<Dijkstra.Vertex> setEdges = (v) -> {
-        Point p = v.point;
-        Point up = new PointImpl(p.getX(), p.getY() + 1);
-        Point down = new PointImpl(p.getX(), p.getY() - 1);
-        Point left = new PointImpl(p.getX() - 1, p.getY());
-        Point right = new PointImpl(p.getX() + 1, p.getY());
-
-
-        if (board.isAt(up, Elements.NONE) || board.isAt(up, Elements.GOOD_APPLE)) {
-            graph.stream().filter((c) ->
-                    c.point.equals(up)
-            ).findFirst().ifPresent((vUp) -> v.edges.add(new Dijkstra.Edge(vUp, 1)));
-        }
-
-
-        if (board.isAt(down, Elements.NONE) || board.isAt(down, Elements.GOOD_APPLE)) {
-            graph.stream().filter((c) ->
-                    c.point.equals(down)
-            ).findFirst().ifPresent((vDown) -> v.edges.add(new Dijkstra.Edge(vDown, 1)));
-
-        }
-
-
-        if (board.isAt(left, Elements.NONE) || board.isAt(left, Elements.GOOD_APPLE)) {
-            graph.stream().filter((c) ->
-                    c.point.equals(left)
-            ).findFirst().ifPresent((vLeft) -> v.edges.add(new Dijkstra.Edge(vLeft, 1)));
-
-        }
-
-
-        if (board.isAt(right, Elements.NONE) || board.isAt(right, Elements.GOOD_APPLE)) {
-            graph.stream().filter((c) ->
-                    c.point.equals(right)
-            ).findFirst().ifPresent(vRight -> v.edges.add(new Dijkstra.Edge(vRight, 1)));
-        }
-    };
 
 
     public static void main(String[] args) {

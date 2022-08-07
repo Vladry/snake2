@@ -16,6 +16,8 @@ import static scala.collection.immutable.Nil.head;
  * pw: slyslysly
  * email: rvy@ukr.net
  */
+
+@SuppressWarnings("ALL")
 public class YourSolver implements Solver<Board> {
 
     private Dice dice;
@@ -70,8 +72,21 @@ public class YourSolver implements Solver<Board> {
 
             if (this.path.size() > 1) {
                 System.out.println("сработало: if (this.path.size() > 1) и заходим в getDirection ");
-                dir = getDirection(this.board, this.path);  // и передали path в модуль получения Direction
-                System.out.println("получили в getDirection dir= " + dir + "и вышли в .get()");
+
+
+
+                if(this.path.size() < 35)
+                {
+                    dir = getDirection(this.board, this.path);  // и передали path в модуль получения Direction
+                    System.out.println("получили в getDirection dir= " + dir + "и вышли в .get()");
+                }
+                else {
+                    dir = getStickyDirection(this.board, this.path);
+                }
+
+
+
+
             } else
             // Если не найден путь к яблоку (в пути только один элемент -голова змени) - направляемся к камню. Для этого нужно переформировать graph вставив туда камень вместо яблока
             {
@@ -197,6 +212,29 @@ public class YourSolver implements Solver<Board> {
         return dir;
     }
 
+    public static String getStickyDirection(Board board, LinkedList<Point> path){
+        System.out.println("in getStickyDirection");
+        Point head = board.getHead();
+
+        String dir = null;
+        Point nextStep = path.get(1);
+        System.out.println("nextStep: " + nextStep);
+        System.out.println("head: " + head);
+        if (nextStep.getX() > head.getX()
+                && nextStep.getY() == head.getY()) {
+            dir = Direction.RIGHT.toString();
+        } else if (nextStep.getX() < head.getX()
+                && nextStep.getY() == head.getY()) {
+            dir = Direction.LEFT.toString();
+        } else if (nextStep.getY() > head.getY()
+                && nextStep.getX() == head.getX()) {
+            dir = Direction.UP.toString();
+        } else if (nextStep.getY() < head.getY()
+                && nextStep.getX() == head.getX()) {
+            dir = Direction.DOWN.toString();
+        }
+        return dir;
+    }
 
     public static void main(String[] args) {
         WebSocketRunner.runClient(

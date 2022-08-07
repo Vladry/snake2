@@ -65,23 +65,26 @@ public class YourSolver implements Solver<Board> {
                             (v) -> (v.point.getX() == apple.getX() && v.point.getY() == apple.getY()))
                     .findFirst().orElse(null);
 
-            System.out.println("получили destination: " + destination);
             //  получили под destination искомый path
             this.path = getPath(destination);
             String dir = null;
 
             if (this.path.size() > 1) {
-                System.out.println("сработало: if (this.path.size() > 1) и заходим в getDirection ");
+                System.out.println("this.path.size()= " + this.path.size());
 
 
-                int snakeSizeLimit = 5;
+
+                int snakeSizeLimit = 28;
                 if (board.getSnake().size() < snakeSizeLimit) {
+                    System.out.println("змея короче чем snakeSizeLimit");
                     // и передали path в модуль получения Direction
                     Point nextStep = getDirection(this.board, this.path);
+                    System.out.println("nextStep: " + nextStep);
                     dir = finalizeDirection(nextStep);
-                    System.out.println("получили в getDirection dir= " + dir + "и вышли в .get()");
                 } else {
+                    System.out.println("змея длиннее чем snakeSizeLimit");
                     Point nextStep = getStickyDirection(this.board, this.path);
+                    System.out.println("nextStep: " + nextStep);
                     dir = finalizeDirection(nextStep);
                 }
 
@@ -89,26 +92,21 @@ public class YourSolver implements Solver<Board> {
             } else
             // Если не найден путь к яблоку (в пути только один элемент -голова змени) - направляемся к камню. Для этого нужно переформировать graph вставив туда камень вместо яблока
             {
-                System.out.println("!!! path not found. Snakes heads out toward a stone!");
+                System.out.println("путь к яблоку не найден!  Вставляем в граф Камень и destination = board.getStones().get(0)");
                 this.graph = createGraph(board, true);
                 destination = new Dijkstra.Vertex(board.getStones().get(0));
                 this.path = getPath(destination);
-                Point nextStep = getDirection(board, this.path);
-                dir = finalizeDirection(nextStep);
-            }
-
-            // Eсли не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
-            if (path.size() < 2 || dir == null) {
-                if (board.isAt(head.getX() - 1, head.getY(), Elements.NONE)) {
-                    dir = Direction.LEFT.toString();
-                } else if (board.isAt(head.getX() + 1, head.getY(), Elements.NONE)) {
-                    dir = Direction.RIGHT.toString();
-                } else if (board.isAt(head.getX(), head.getY() - 1, Elements.NONE)) {
-                    dir = Direction.DOWN.toString();
-                } else {
-                    dir = Direction.UP.toString();
+                System.out.println("this.path.size()= " + this.path.size());
+                if (this.path.size() > 1) {//если найден путь хотя бы к камню - идём на камень
+                    Point nextStep = getDirection(board, this.path);
+                    dir = finalizeDirection(nextStep);
+                    System.out.println("dir = finalizeDirection() = " +dir);
+                } else {//иначе, если не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
+                    dir = finalizeIfNoPathFound();
+                    System.out.println("dir = finalizeIfNoPathFound() = " +dir);
                 }
             }
+
             System.out.println("direction before quitting:  " + dir);
             return dir;
 
@@ -185,33 +183,30 @@ public class YourSolver implements Solver<Board> {
     }
 
     public static Point getDirection(Board board, LinkedList<Point> path) {
-        System.out.println("in getDirection");
-        System.out.println("path: " + path);
         Point head = board.getHead();
-
         String dir = null;
         Point nextStep = path.get(1);
-        System.out.println("nextStep: " + nextStep);
-        System.out.println("head: " + head);
-
         return nextStep;
     }
 
     public static Point getStickyDirection(Board board, LinkedList<Point> path) {
-        System.out.println("in getStickyDirection");
         Point head = board.getHead();
+        Point apple = board.getApples().get(0);
         Point nextStep = null;
-        System.out.println("head: " + head);
         String dir = null;
 
         int leftEndpoint = 1;
         int rightEndpoint = 2;
 
-        if (board.isNear(head, Elements.GOOD_APPLE)) {
+        // если поблизости яблоко -хватаем его
+        if (Math.abs(head.getX() - apple.getX()) < 2
+                && Math.abs(head.getY() - apple.getY()) == 0
+//                && Math.abs(head.getY() - apple.getY()) < 2
+                && (board.getSnakeDirection().equals(Direction.RIGHT.toString())
+                || board.getSnakeDirection().equals(Direction.LEFT.toString()))
+        ) {
             nextStep = path.get(1);
-        }
-
-        if (board.isAt(head.getX() - leftEndpoint, head.getY(), Elements.NONE)
+        } else if (board.isAt(head.getX() - leftEndpoint, head.getY(), Elements.NONE)
                 && head.getX() > rightEndpoint
         ) {
             nextStep = new PointImpl(head.getX() - 1, head.getY());
@@ -230,21 +225,54 @@ public class YourSolver implements Solver<Board> {
         Point head = this.board.getHead();
         String dir = null;
         if (nextStep.getX() > head.getX()
-                && nextStep.getY() == head.getY()) {
+                && nextStep.getY() == head.getY()
+                && (board.isAt(head.getX() + 1, head.getY(), Elements.NONE)
+                || board.isAt(head.getX() + 1, head.getY(), Elements.GOOD_APPLE))
+        ) {
             dir = Direction.RIGHT.toString();
-        } else if (nextStep.getX() < head.getX()
-                && nextStep.getY() == head.getY()) {
+        }
+
+        else if (nextStep.getX() < head.getX()
+                && nextStep.getY() == head.getY()
+                && (board.isAt(head.getX() - 1, head.getY(), Elements.NONE)
+                || board.isAt(head.getX() - 1, head.getY(), Elements.GOOD_APPLE))
+        ) {
             dir = Direction.LEFT.toString();
-        } else if (nextStep.getY() > head.getY()
-                && nextStep.getX() == head.getX()) {
+        }
+
+        else if (nextStep.getY() > head.getY()
+                && nextStep.getX() == head.getX()
+                && (board.isAt(head.getX(), head.getY() + 1, Elements.NONE)
+                || board.isAt(head.getX(), head.getY()+1, Elements.GOOD_APPLE))
+        ) {
             dir = Direction.UP.toString();
-        } else if (nextStep.getY() < head.getY()
-                && nextStep.getX() == head.getX()) {
+        }
+
+        else if (nextStep.getY() < head.getY()
+                && nextStep.getX() == head.getX()
+                && (board.isAt(head.getX(), head.getY() - 1, Elements.NONE)
+                || board.isAt(head.getX(), head.getY() - 1, Elements.GOOD_APPLE))
+        ) {
             dir = Direction.DOWN.toString();
         }
         return dir;
     }
 
+    public String finalizeIfNoPathFound() {
+        // Eсли не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
+        Point head = board.getHead();
+        String dir = null;
+        if (this.board.isAt(head.getX() - 1, head.getY(), Elements.NONE)) {
+            dir = Direction.LEFT.toString();
+        } else if (this.board.isAt(head.getX() + 1, head.getY(), Elements.NONE)) {
+            dir = Direction.RIGHT.toString();
+        } else if (this.board.isAt(head.getX(), head.getY() - 1, Elements.NONE)) {
+            dir = Direction.DOWN.toString();
+        } else {
+            dir = Direction.UP.toString();
+        }
+        return dir;
+    }
 
     public static void main(String[] args) {
         WebSocketRunner.runClient(

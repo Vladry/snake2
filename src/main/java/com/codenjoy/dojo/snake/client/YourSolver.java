@@ -9,8 +9,6 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import static com.codenjoy.dojo.snake.client.Dijkstra.buildPath;
-import static com.codenjoy.dojo.snake.client.Dijkstra.computeGraph;
 import static scala.collection.immutable.Nil.head;
 
 /**
@@ -47,38 +45,55 @@ public class YourSolver implements Solver<Board> {
 //        if(head == null){return Direction.UP.toString();}
 
 
-        List<Point> freeSpace = board.get(Elements.NONE, Elements.GOOD_APPLE);
-        freeSpace.add(head);
-        this.graph = freeSpace.stream().map(Dijkstra.Vertex::new).collect(Collectors.toList());
+        try{
+            List<Point> freeSpace = board.get(Elements.NONE, Elements.GOOD_APPLE);
+            freeSpace.add(head);
+            this.graph = freeSpace.stream().map(Dijkstra.Vertex::new).collect(Collectors.toList());
 
-        this.graph.forEach((v) -> setEdges.accept(v));
-
-
-        System.out.println("тестируем код");
-//        System.out.println(graph);
-
-        graph.stream().filter(
-                        (v) -> (v.point.getX() == head.getX() && v.point.getY() == head.getY()))
-                .findFirst().ifPresent(Dijkstra::computeGraph);
+            this.graph.forEach((v) -> setEdges.accept(v));
 
 
-        Dijkstra.Vertex destination = graph.stream().filter(
-                        (v) -> (v.point.getX() == apple.getX() && v.point.getY() == apple.getY()))
-                .findFirst().orElse(null);
+            System.out.println("тестируем код");
+            graph.stream().filter(
+                            (v) -> (v.point.getX() == head.getX() && v.point.getY() == head.getY()))
+                    .findFirst().ifPresent(Dijkstra::computeGraph);
 
+
+            Dijkstra.Vertex destination = graph.stream().filter(
+                            (v) -> (v.point.getX() == apple.getX() && v.point.getY() == apple.getY()))
+                    .findFirst().orElse(null);
+
+//--------------------------------------
+
+            LinkedList<Point> path = new LinkedList<>();
+            String dir = getDirection(board, graph, destination, path);
+            if (path.size() == 0) {
+                // TODO  добавить rock в graph , destination = Vertex(rock)) и снова ныряем в String dir = getDirection(board, graph, destination, path);
+            }
+            return dir;
+
+
+
+
+        }catch (Exception e){
+            System.out.println("общее исключение .get()");
+        }
+        return Direction.UP.toString();
+    }
+
+
+    public static String getDirection(Board board, List<Dijkstra.Vertex> graph, Dijkstra.Vertex destination, LinkedList<Point> path){
+        Point head = board.getHead();
 
         String dir = null;
-//        System.out.println("destination: " + destination);
-//        if (destination != null) {
-        LinkedList<Point> path = Dijkstra.buildPath(destination);
+        path = Dijkstra.buildPath(destination);
         Point nextStep;
-        if (path.get(1) != null) {
+        if (path.size() > 1) {
             nextStep = path.get(1);
         } else {
             nextStep = path.get(0);
         }
 
-        System.out.println("nextStep: " + nextStep);
         System.out.println("nextStep: " + nextStep);
         System.out.println("head: " + head);
         if (nextStep.getX() > head.getX()
@@ -93,12 +108,10 @@ public class YourSolver implements Solver<Board> {
         } else if (nextStep.getY() < head.getY()
                 && nextStep.getX() == head.getX()) {
             dir = Direction.DOWN.toString();
-//            }
-
         }
-        System.out.println("dir: " + dir);
-        return (dir == null) ? Direction.UP.toString() : dir;
+        return dir;
     }
+
 
     Consumer<Dijkstra.Vertex> setEdges = (v) -> {
         Point p = v.point;

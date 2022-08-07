@@ -47,7 +47,7 @@ public class YourSolver implements Solver<Board> {
 
 
         try {
-            this.graph = createGraph(this.board, Elements.GOOD_APPLE);
+            this.graph = createGraph(this.board, false);
 
             System.out.println("тестируем код");
 
@@ -56,31 +56,37 @@ public class YourSolver implements Solver<Board> {
                             (v) -> (v.point.getX() == head.getX() && v.point.getY() == head.getY()))
                     .findFirst().ifPresent(Dijkstra::computeGraph);
 
+            System.out.println("нашли голову в графе. Направляемся к яблоку ");
 
             // Направляемся к яблоку.   Сначала получим из графа Vertex яблока и присвоим его в destination
             Dijkstra.Vertex destination = this.graph.stream().filter(
                             (v) -> (v.point.getX() == apple.getX() && v.point.getY() == apple.getY()))
                     .findFirst().orElse(null);
 
+            System.out.println("получили destination: " + destination);
             //  получили под destination искомый path
             this.path = getPath(destination);
             String dir = null;
 
-            if (this.path.size() > 0) {
+            if (this.path.size() > 1) {
+                System.out.println("сработало: if (this.path.size() > 1) и заходим в getDirection ");
                 dir = getDirection(this.board, this.path);  // и передали path в модуль получения Direction
+                System.out.println("получили в getDirection dir= " + dir + "и вышли в .get()");
             } else
-            // Если не найден путь к яблоку - направляемся к камню. Для этого нужно переформировать graph вставив туда камень вместо яблока
+            // Если не найден путь к яблоку (в пути только один элемент -голова змени) - направляемся к камню. Для этого нужно переформировать graph вставив туда камень вместо яблока
             {
                 System.out.println("!!! path not found. Snakes heads out toward a stone!");
-                this.graph = createGraph(board, Elements.BAD_APPLE);
+                this.graph = createGraph(board, true);
                 destination = new Dijkstra.Vertex(board.getStones().get(0));
                 this.path = getPath(destination);
                 dir = getDirection(board, this.path);
             }
 
+            // TODO прописать алгоритм прохода к яблоку по единственному пути- узкому тоннелю, когда на пути к яблоку есть камень,
+            // TODO чтобы шла на камень, сьедала, но доходила до яблока.
 
             // Eсли не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
-/*            if (path.size() == 0) {
+            if (path.size() < 2 || dir == null) {
                 if (board.isAt(head.getX() - 1, head.getY(), Elements.NONE)) {
                     dir = Direction.LEFT.toString();
                 } else if (board.isAt(head.getX() + 1, head.getY(), Elements.NONE)) {
@@ -90,7 +96,7 @@ public class YourSolver implements Solver<Board> {
                 } else {
                     dir = Direction.UP.toString();
                 }
-            }*/
+            }
             System.out.println("direction before quitting:  " + dir);
             return dir;
 
@@ -102,10 +108,18 @@ public class YourSolver implements Solver<Board> {
     }
 
 
-    public List<Dijkstra.Vertex> createGraph(Board board, Elements target) {
+    public List<Dijkstra.Vertex> createGraph(Board board, boolean isRockIncluded) {
+        System.out.println("in createGraph");
         List<Dijkstra.Vertex> graph;
 
-        List<Point> freeSpace = board.get(Elements.NONE, target);
+        List<Point> freeSpace = null;
+        if (!isRockIncluded) {
+            freeSpace = board.get(Elements.NONE, Elements.GOOD_APPLE);
+        } else {
+            freeSpace = board.get(Elements.NONE, Elements.GOOD_APPLE, Elements.BAD_APPLE);
+        }
+
+
         freeSpace.add(board.getHead());
         graph = freeSpace.stream().map(Dijkstra.Vertex::new).collect(Collectors.toList());
 
@@ -154,20 +168,17 @@ public class YourSolver implements Solver<Board> {
     }
 
     public LinkedList<Point> getPath(Dijkstra.Vertex destination) {
+        System.out.println("in getPath");
         return Dijkstra.buildPath(destination);
     }
 
     public static String getDirection(Board board, LinkedList<Point> path) {
+        System.out.println("in getDirection");
+        System.out.println("path: " + path);
         Point head = board.getHead();
 
         String dir = null;
-        Point nextStep;
-        if (path.size() > 1) {
-            nextStep = path.get(1);
-        } else {
-            nextStep = path.get(0);
-        }
-
+        Point nextStep = path.get(1); // TODO:  тут раньше получали NullPointerException
         System.out.println("nextStep: " + nextStep);
         System.out.println("head: " + head);
         if (nextStep.getX() > head.getX()

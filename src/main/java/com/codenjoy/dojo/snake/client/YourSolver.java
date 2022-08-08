@@ -70,7 +70,7 @@ public class YourSolver implements Solver<Board> {
             String dir = null;
 
             if (this.path.size() > 1) {
-                System.out.println("this.path.size()= " + this.path.size());
+//                System.out.println("this.path.size()= " + this.path.size());
 
                 // по длине змейки получаем нужные params для задания режима дальнейшей работы
                 YourSolver.SnakeParams modeParams = getSnakeParams(board.getSnake().size());
@@ -80,33 +80,33 @@ public class YourSolver implements Solver<Board> {
                     System.out.println("змея короче чем smallEndPoint");
                     // и передали path в модуль получения Direction
                     Point nextStep = getDirection(this.board, this.path);
-                    System.out.println("nextStep: " + nextStep);
+//                    System.out.println("nextStep: " + nextStep);
                     dir = finalizeDirection(nextStep);
 
                 } else {// режим скручивания в змеевик:
                     System.out.println("змея длиннее чем smallEndPoint");
                     Point nextStep = getStickyDirection(
                             this.board, this.path, modeParams.leftEndpoint, modeParams.rightEndpoint);
-                    System.out.println("nextStep: " + nextStep);
+//                    System.out.println("nextStep: " + nextStep);
                     dir = finalizeDirection(nextStep);
                 }
 
 
-            } else
-            // Если не найден путь к яблоку (в пути только один элемент -голова змени) - направляемся к камню. Для этого нужно переформировать graph вставив туда камень вместо яблока
+            } else // Если не найден путь к яблоку (в пути только один элемент -голова змеи) - направляемся к камню. Для этого нужно переформировать graph вставив туда камень вместо яблока
             {
                 System.out.println("путь к яблоку не найден!  Вставляем в граф Камень и destination = board.getStones().get(0)");
                 this.graph = createGraph(board, true);
-                destination = new Dijkstra.Vertex(board.getStones().get(0));
+                destination = this.graph.stream().filter((v) -> v.point.equals((board.getStones().get(0)))).findFirst().orElse(null);
+                System.out.println("в граф вставили Камень и записали его в destination в виде:" + destination);
                 this.path = getPath(destination);
-                System.out.println("this.path.size()= " + this.path.size());
+//                System.out.println("this.path.size()= " + this.path.size());
                 if (this.path.size() > 1) {//если найден путь хотя бы к камню - идём на камень
                     Point nextStep = getDirection(board, this.path);
                     dir = finalizeDirection(nextStep);
-                    System.out.println("dir = finalizeDirection() = " +dir);
+//                    System.out.println("dir = finalizeDirection() = " +dir);
                 } else {//иначе, если не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
                     dir = finalizeIfNoPathFound();
-                    System.out.println("dir = finalizeIfNoPathFound() = " +dir);
+//                    System.out.println("dir = finalizeIfNoPathFound() = " +dir);
                 }
             }
 
@@ -121,7 +121,7 @@ public class YourSolver implements Solver<Board> {
     }
 
 
-    private class SnakeParams{
+    private class SnakeParams {
         boolean snakeSmall;
         // ограничители скручивания змейки в змеевик в зависимости от длины змейки snakeLength (snakeSize)
         int leftEndpoint;
@@ -134,26 +134,33 @@ public class YourSolver implements Solver<Board> {
         }
     }
 
-    public YourSolver.SnakeParams getSnakeParams(int snakeLength){
-        boolean snakeSmall = false; //параметр для переключения с режима прямого поиска по Дейскстре в режим
-        //большой змеи, когда она начинает скручиваться в змеевик и включается sticky
-        int smallEndPoint = 20;
+    public YourSolver.SnakeParams getSnakeParams(int snakeLength) {
+        System.out.println("in getSnakeParams(int snakeLength)");
+        System.out.println("snakeLength: " + snakeLength);
+        boolean snakeSmall = true; //параметр для переключения с режима прямого поиска по Дейскстре в режим
+        //большой змеи, когда она начинает скручиваться в змеевик и включается getStickyDirection()
+
+        //ниже задаются эндпоинты для длин змеи, при которых переключаются режимы работы алгоритма скручивания в змеевик:
         int mediumStartPoint = 30;
         int largeStartPoint = 40;
         // ограничители скручивания змейки в змеевик в зависимости от длины змейки snakeLength (snakeSize)
         int leftEndpoint = 1;
-        int rightEndpoint = this.board.size()-1;
+        int rightEndpoint = this.board.size() - 1;
 
-        if(snakeLength > smallEndPoint
-                && snakeLength < mediumStartPoint) {
+        if (snakeLength > mediumStartPoint
+                && snakeLength < largeStartPoint) {
+            System.out.println("snakeMedium, ");
             snakeSmall = false;
-            leftEndpoint = 4;
-            rightEndpoint = this.board.size()-4;
+            leftEndpoint = 5;
+            rightEndpoint = this.board.size() - 6;
         }
-        if(snakeLength >= largeStartPoint ) {
+        if (snakeLength >= largeStartPoint) {
+            System.out.println("snakeLarge, ");
+            snakeSmall = false;
             leftEndpoint = 2;
-            rightEndpoint = this.board.size()-2;
+            rightEndpoint = this.board.size() - 3;
         }
+        System.out.println("leftEndpoint: " + leftEndpoint + ",  rightEndpoint: " + rightEndpoint);
         return new YourSolver.SnakeParams(snakeSmall, leftEndpoint, rightEndpoint);
     }
 
@@ -229,32 +236,39 @@ public class YourSolver implements Solver<Board> {
     }
 
     public static Point getStickyDirection(Board board, LinkedList<Point> path, int leftEndpoint, int rightEndpoint) {
+        // leftEndpoint, int rightEndpoint - левый и правый ограничители ширины скручивания змеи в змеевик. Чем длиннее змея -тем шире змеевик (т.е. эти границы расширяются)
         Point head = board.getHead();
         Point apple = board.getApples().get(0);
         Point nextStep = null;
         String dir = null;
 
-        // если поблизости яблоко -хватаем его
-        if (Math.abs(head.getX() - apple.getX()) < 2
-                && Math.abs(head.getY() - apple.getY()) == 0
-//                && Math.abs(head.getY() - apple.getY()) < 2
-                && (board.getSnakeDirection().equals(Direction.RIGHT.toString())
-                || board.getSnakeDirection().equals(Direction.LEFT.toString()))
+        // если унюхали поблизости яблоко -хватаем его!
+        if ( (Math.abs(head.getX() - apple.getX()) < 15) //длина "нюха" по оси Х
+//                && Math.abs(head.getY() - apple.getY()) == 0 // длина "нюха" по оси Y -нулевая, либо:
+                && (Math.abs(head.getY() - apple.getY()) < 1) //длина "нуха" по оси Y
+//                && (board.getSnakeDirection().equals(Direction.RIGHT.toString())
+//                || board.getSnakeDirection().equals(Direction.LEFT.toString()))
+
+
+        || Math.abs( head.getY() - apple.getY()) > 5 //либо прямой ход далее работает, когда расстояние по Y более указанного
         ) {
-            System.out.println("nextStep: in str.224");
-            nextStep = path.get(1);
-            System.out.println(nextStep);
-        } else if (board.isAt(head.getX() - 1, head.getY(), Elements.NONE)
-                && head.getX() > leftEndpoint
-        ) {
-            nextStep = new PointImpl(head.getX() - 1, head.getY());
-        } else if (board.isAt(head.getX() + 1, head.getY(), Elements.NONE)
-                && head.getX() < board.size() - rightEndpoint
-        ) {
-            nextStep = new PointImpl(head.getX() + 1, head.getY());
-        } else {
             nextStep = path.get(1);
         }
+
+
+        else //иначе проверяем
+            // складываем змейку в змеевик
+            if (board.isAt(head.getX() - 1, head.getY(), Elements.NONE, Elements.GOOD_APPLE)
+                    && head.getX() > leftEndpoint
+            ) {
+                nextStep = new PointImpl(head.getX() - 1, head.getY());
+            } else if (board.isAt(head.getX() + 1, head.getY(), Elements.NONE, Elements.GOOD_APPLE)
+                    && head.getX() < rightEndpoint
+            ) {
+                nextStep = new PointImpl(head.getX() + 1, head.getY());
+            } else {
+                nextStep = path.get(1);
+            }
 
         return nextStep;
     }
@@ -268,25 +282,19 @@ public class YourSolver implements Solver<Board> {
                 || board.isAt(head.getX() + 1, head.getY(), Elements.GOOD_APPLE))
         ) {
             dir = Direction.RIGHT.toString();
-        }
-
-        else if (nextStep.getX() < head.getX()
+        } else if (nextStep.getX() < head.getX()
                 && nextStep.getY() == head.getY()
                 && (board.isAt(head.getX() - 1, head.getY(), Elements.NONE)
                 || board.isAt(head.getX() - 1, head.getY(), Elements.GOOD_APPLE))
         ) {
             dir = Direction.LEFT.toString();
-        }
-
-        else if (nextStep.getY() > head.getY()
+        } else if (nextStep.getY() > head.getY()
                 && nextStep.getX() == head.getX()
                 && (board.isAt(head.getX(), head.getY() + 1, Elements.NONE)
-                || board.isAt(head.getX(), head.getY()+1, Elements.GOOD_APPLE))
+                || board.isAt(head.getX(), head.getY() + 1, Elements.GOOD_APPLE))
         ) {
             dir = Direction.UP.toString();
-        }
-
-        else if (nextStep.getY() < head.getY()
+        } else if (nextStep.getY() < head.getY()
                 && nextStep.getX() == head.getX()
                 && (board.isAt(head.getX(), head.getY() - 1, Elements.NONE)
                 || board.isAt(head.getX(), head.getY() - 1, Elements.GOOD_APPLE))

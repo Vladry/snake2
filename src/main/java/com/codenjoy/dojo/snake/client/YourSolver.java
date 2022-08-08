@@ -70,9 +70,6 @@ public class YourSolver implements Solver<Board> {
             String dir = null;
 
 
-            Dijkstra.Vertex bestV = findBestDetour(head);
-            System.out.println("best V is:" + bestV.point);
-
             if (this.path.size() > 1) {
 //                System.out.println("this.path.size()= " + this.path.size());
 
@@ -104,13 +101,16 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("в граф вставили Камень и записали его в destination в виде:" + destination);
                 this.path = getPath(destination);
 //                System.out.println("this.path.size()= " + this.path.size());
-                if (this.path.size() > 1) {//если найден путь хотя бы к камню - идём на камень
+                if (this.path.size() > 1) { // если найден путь хотя бы к камню - идём на камень
                     Point nextStep = getDirection(board, this.path);
                     dir = finalizeDirection(nextStep);
 //                    System.out.println("dir = finalizeDirection() = " +dir);
+
                 } else {//иначе, если не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
-                    dir = finalizeIfNoPathFound();
-//                    System.out.println("dir = finalizeIfNoPathFound() = " +dir);
+                    Point bestV = findBestDetour(head);
+                    System.out.println("best V is:" + bestV);
+                    Point nextStep = bestV;
+                    dir = finalizeDirection(nextStep);
                 }
             }
 
@@ -169,7 +169,7 @@ public class YourSolver implements Solver<Board> {
     }
 
     // сюда отправляем nextStep в случаях, когда пути к яблоку и камню не найдены и принимаем
-    public Dijkstra.Vertex findBestDetour(Point head) {
+    public Point findBestDetour(Point head) {
 
         System.out.println("in findBestDetour()");
         Dijkstra.Vertex headV = this.graph.stream().filter((v) -> v.point.equals(head)).findFirst().orElse(null);
@@ -180,24 +180,24 @@ public class YourSolver implements Solver<Board> {
 //берем у головы все её три смежные вершины и, в цикле ищем, для какой вершины будет макс.число totalVertexesFound. Эту вершины и возвращаем как bestVertex
 //            System.out.println("inside of for-loop");
             System.out.println("checking sub-vertex: " + e.v.point);
-            int vertCount = countSubVertexes(e.v);
+            Set<Dijkstra.Vertex> visited = new HashSet<>();
+            int vertCount = countSubVertexes(e.v, visited);
             System.out.println("a headBranch "+ e.v.point +" has " +vertCount + " sub-branches");
+            System.out.println("visited.size(): " + visited.size());
             if (vertCount > totalVertexesFound) {
                 totalVertexesFound = vertCount;
                 bestVertex = e.v;
             }
         }
-        bestVertex = headV; //TODO удалить эту строчку!
         System.out.println("exiting findBestDetour.  Возвращаем bestVertex= " + bestVertex.point);
-        return bestVertex;
+        return bestVertex.point;
     }
-
-    int countSubVertexes(Dijkstra.Vertex current) {
-        if(current==null || current.visited) return 0;
-        current.visited = true;
+    int countSubVertexes(Dijkstra.Vertex current, Set<Dijkstra.Vertex> visited) {
+        if(current==null || visited.contains(current)) return 0;
+        visited.add(current);
         int vertexCounter = 1;
         for (Dijkstra.Edge e : current.edges) {
-            vertexCounter = countSubVertexes(e.v);
+            vertexCounter += countSubVertexes(e.v, visited);
         }
         return vertexCounter;
     }
@@ -339,21 +339,21 @@ public class YourSolver implements Solver<Board> {
         return dir;
     }
 
-    public String finalizeIfNoPathFound() {
-        // Eсли не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
-        Point head = board.getHead();
-        String dir = null;
-        if (this.board.isAt(head.getX() - 1, head.getY(), Elements.NONE)) {
-            dir = Direction.LEFT.toString();
-        } else if (this.board.isAt(head.getX() + 1, head.getY(), Elements.NONE)) {
-            dir = Direction.RIGHT.toString();
-        } else if (this.board.isAt(head.getX(), head.getY() - 1, Elements.NONE)) {
-            dir = Direction.DOWN.toString();
-        } else {
-            dir = Direction.UP.toString();
-        }
-        return dir;
-    }
+//    public String finalizeIfNoPathFound() {
+//        // Eсли не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
+//        Point head = board.getHead();
+//        String dir = null;
+//        if (this.board.isAt(head.getX() - 1, head.getY(), Elements.NONE)) {
+//            dir = Direction.LEFT.toString();
+//        } else if (this.board.isAt(head.getX() + 1, head.getY(), Elements.NONE)) {
+//            dir = Direction.RIGHT.toString();
+//        } else if (this.board.isAt(head.getX(), head.getY() - 1, Elements.NONE)) {
+//            dir = Direction.DOWN.toString();
+//        } else {
+//            dir = Direction.UP.toString();
+//        }
+//        return dir;
+//    }
 
     public static void main(String[] args) {
         WebSocketRunner.runClient(

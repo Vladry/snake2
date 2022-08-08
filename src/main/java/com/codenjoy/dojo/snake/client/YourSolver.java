@@ -45,86 +45,81 @@ public class YourSolver implements Solver<Board> {
         if (board.isGameOver()) {
             return Direction.UP.toString();
         }
-//        if(head == null){return Direction.UP.toString();}
-
 
         try {
-            this.graph = createGraph(this.board, false);
-
-            System.out.println("тестируем код");
-
-            // находим в графе Vertex головы змеи и (если найдена) - отправляем её в качестве source для просчета Дейкстры
-            this.graph.stream().filter(
-                            (v) -> (v.point.getX() == head.getX() && v.point.getY() == head.getY()))
-                    .findFirst().ifPresent(Dijkstra::computeGraph);
-
-            System.out.println("нашли голову в графе. Направляемся к яблоку ");
-
-            // Направляемся к яблоку.   Сначала получим из графа Vertex яблока и присвоим его в destination
-            Dijkstra.Vertex destination = this.graph.stream().filter(
-                            (v) -> (v.point.getX() == apple.getX() && v.point.getY() == apple.getY()))
-                    .findFirst().orElse(null);
-
-            //  получили искомый path для заданного destination
-            this.path = getPath(destination);
+            Point nextStep = null;
             String dir = null;
-
-
-            if (this.path.size() > 1) {
-//                System.out.println("this.path.size()= " + this.path.size());
-
-                // по длине змейки получаем нужные params для задания режима дальнейшей работы
+            this.path = findPathToApple();
+            if (this.path.size() > 1) { // по длине змейки получаем нужные params для задания режима дальнейшей работы
                 YourSolver.SnakeParams modeParams = getSnakeParams(board.getSnake().size());
 
-                // режим прямого поиска яблока по Дейкстре:
+                // режим прямого поиска яблока по Дейкстре (пока змейка маленькая):
                 if (modeParams.snakeSmall) {
                     System.out.println("змея короче чем smallEndPoint");
-                    // и передали path в модуль получения Direction
-                    Point nextStep = getDirection(this.board, this.path);
-//                    System.out.println("nextStep: " + nextStep);
-                    dir = finalizeDirection(nextStep);
+                    nextStep = getDirection(this.board, this.path);
 
-                } else {// режим скручивания в змеевик:
+                } else {// режим скручивания в змеевик (когда змейка подросла):
                     System.out.println("змея длиннее чем smallEndPoint");
-                    Point nextStep = getStickyDirection(
+                    nextStep = getZdirection(
                             this.board, this.path, modeParams.leftEndpoint, modeParams.rightEndpoint);
-//                    System.out.println("nextStep: " + nextStep);
-                    dir = finalizeDirection(nextStep);
                 }
 
 
             } else // Если не найден путь к яблоку (в пути только один элемент -голова змеи) - направляемся к камню. Для этого нужно переформировать graph вставив туда камень вместо яблока
             {
-                System.out.println("путь к яблоку не найден!  Вставляем в граф Камень и destination = board.getStones().get(0)");
-                this.graph = createGraph(board, true);
-                destination = this.graph.stream().filter((v) -> v.point.equals((board.getStones().get(0)))).findFirst().orElse(null);
-                System.out.println("в граф вставили Камень и записали его в destination в виде:" + destination);
-                this.path = getPath(destination);
-//                System.out.println("this.path.size()= " + this.path.size());
+                this.path = findPathToRock();
                 if (this.path.size() > 1) { // если найден путь хотя бы к камню - идём на камень
-                    Point nextStep = getDirection(board, this.path);
-                    dir = finalizeDirection(nextStep);
-//                    System.out.println("dir = finalizeDirection() = " +dir);
+                    nextStep = getDirection(board, this.path);
+
 
                 } else {//иначе, если не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
                     Point bestV = findBestDetour(head);
                     System.out.println("best V is:" + bestV);
-                    Point nextStep = bestV;
-                    dir = finalizeDirection(nextStep);
+                    nextStep = bestV;
+
                 }
             }
 
+
+            dir = finalizeDirection(nextStep);
+//----------------------конец ------------------------
             System.out.println("direction before quitting:  " + dir);
             return dir;
-
 
         } catch (Exception e) {
             System.out.println("общее исключение .get()");
             return Direction.DOWN.toString();
         }
     }
+// -------------------методы--------------------------
 
+    public LinkedList<Point> findPathToApple() {
+        this.graph = createGraph(this.board, false);
+        Point head = this.board.getHead();
+        Point apple = this.board.getApples().get(0);
 
+        // находим в графе Vertex головы змеи и (если найдена) - отправляем её в качестве source для просчета Дейкстры
+        this.graph.stream().filter(
+                        (v) -> (v.point.getX() == head.getX() && v.point.getY() == head.getY()))
+                .findFirst().ifPresent(Dijkstra::computeGraph);
+
+        System.out.println("нашли голову в графе. Направляемся к яблоку ");
+
+        // Направляемся к яблоку.   Сначала получим из графа Vertex яблока и присвоим его в destination
+        Dijkstra.Vertex destination = this.graph.stream().filter(
+                        (v) -> (v.point.getX() == apple.getX() && v.point.getY() == apple.getY()))
+                .findFirst().orElse(null);
+
+        //  получили искомый path для заданного destination
+        return getPath(destination);
+    }
+    public LinkedList<Point> findPathToRock() {
+        System.out.println("путь к яблоку не найден!  Пере-содаём граф с Камнем и destination = board.getStones().get(0)");
+        this.graph = createGraph(board, true);
+        Dijkstra.Vertex destination = this.graph.stream().filter((v) -> v.point.equals((board.getStones().get(0)))).findFirst().orElse(null);
+        System.out.println("в граф вставили Камень и записали его в destination в виде:" + destination);
+        return getPath(destination);
+    }
     private class SnakeParams {
         boolean snakeSmall;
         // ограничители скручивания змейки в змеевик в зависимости от длины змейки snakeLength (snakeSize)
@@ -137,7 +132,6 @@ public class YourSolver implements Solver<Board> {
             this.rightEndpoint = rightEndpoint;
         }
     }
-
     public YourSolver.SnakeParams getSnakeParams(int snakeLength) {
         System.out.println("in getSnakeParams(int snakeLength)");
         System.out.println("snakeLength: " + snakeLength);
@@ -167,10 +161,8 @@ public class YourSolver implements Solver<Board> {
         System.out.println("leftEndpoint: " + leftEndpoint + ",  rightEndpoint: " + rightEndpoint);
         return new YourSolver.SnakeParams(snakeSmall, leftEndpoint, rightEndpoint);
     }
-
-    // сюда отправляем nextStep в случаях, когда пути к яблоку и камню не найдены и принимаем
     public Point findBestDetour(Point head) {
-
+        // сюда отправляем nextStep в случаях, когда пути к яблоку и камню не найдены
         System.out.println("in findBestDetour()");
         Dijkstra.Vertex headV = this.graph.stream().filter((v) -> v.point.equals(head)).findFirst().orElse(null);
         System.out.println("headV found: " + headV.point);
@@ -182,7 +174,7 @@ public class YourSolver implements Solver<Board> {
             System.out.println("checking sub-vertex: " + e.v.point);
             Set<Dijkstra.Vertex> visited = new HashSet<>();
             int vertCount = countSubVertexes(e.v, visited);
-            System.out.println("a headBranch "+ e.v.point +" has " +vertCount + " sub-branches");
+            System.out.println("a headBranch " + e.v.point + " has " + vertCount + " sub-branches");
             System.out.println("visited.size(): " + visited.size());
             if (vertCount > totalVertexesFound) {
                 totalVertexesFound = vertCount;
@@ -192,8 +184,8 @@ public class YourSolver implements Solver<Board> {
         System.out.println("exiting findBestDetour.  Возвращаем bestVertex= " + bestVertex.point);
         return bestVertex.point;
     }
-    int countSubVertexes(Dijkstra.Vertex current, Set<Dijkstra.Vertex> visited) {
-        if(current==null || visited.contains(current)) return 0;
+    public int countSubVertexes(Dijkstra.Vertex current, Set<Dijkstra.Vertex> visited) {
+        if (current == null || visited.contains(current)) return 0;
         visited.add(current);
         int vertexCounter = 1;
         for (Dijkstra.Edge e : current.edges) {
@@ -201,7 +193,6 @@ public class YourSolver implements Solver<Board> {
         }
         return vertexCounter;
     }
-
     public List<Dijkstra.Vertex> createGraph(Board board, boolean isRockIncluded) {
         System.out.println("in createGraph");
         List<Dijkstra.Vertex> graph;
@@ -260,20 +251,17 @@ public class YourSolver implements Solver<Board> {
         return graph;
 
     }
-
     public LinkedList<Point> getPath(Dijkstra.Vertex destination) {
         System.out.println("in getPath");
         return Dijkstra.buildPath(destination);
     }
-
-    public static Point getDirection(Board board, LinkedList<Point> path) {
+    public Point getDirection(Board board, LinkedList<Point> path) {
         Point head = board.getHead();
         String dir = null;
         Point nextStep = path.get(1);
         return nextStep;
     }
-
-    public static Point getStickyDirection(Board board, LinkedList<Point> path, int leftEndpoint, int rightEndpoint) {
+    public Point getZdirection(Board board, LinkedList<Point> path, int leftEndpoint, int rightEndpoint) {
         // leftEndpoint, int rightEndpoint - левый и правый ограничители ширины скручивания змеи в змеевик. Чем длиннее змея -тем шире змеевик (т.е. эти границы расширяются)
         Point head = board.getHead();
         Point apple = board.getApples().get(0);
@@ -283,12 +271,8 @@ public class YourSolver implements Solver<Board> {
         // если унюхали поблизости яблоко -хватаем его!
         if ((Math.abs(head.getX() - apple.getX()) < 15) //длина "нюха" по оси Х
 //                && Math.abs(head.getY() - apple.getY()) == 0 // длина "нюха" по оси Y -нулевая, либо:
-                && (Math.abs(head.getY() - apple.getY()) < 1) //длина "нуха" по оси Y
-//                && (board.getSnakeDirection().equals(Direction.RIGHT.toString())
-//                || board.getSnakeDirection().equals(Direction.LEFT.toString()))
-
-
-                || Math.abs(head.getY() - apple.getY()) > 5 //либо прямой ход далее работает, когда расстояние по Y более указанного
+                && (Math.abs(head.getY() - apple.getY()) <= 2) //длина "нюха" по оси Y
+                || Math.abs(head.getY() - apple.getY()) > 3 //либо прямой ход по Дейкстре работает далее без скрутки в змеевик, если расстояние по Y более указанного
         ) {
             nextStep = path.get(1);
         } else //иначе проверяем
@@ -305,9 +289,35 @@ public class YourSolver implements Solver<Board> {
                 nextStep = path.get(1);
             }
 
+        boolean isStepAllowed = inspectForWayBack(board, path, nextStep);
+        if (isStepAllowed) {
+            return nextStep;
+        } else {
+
+        }
         return nextStep;
     }
+    public boolean inspectForWayBack(Board board, List<Point> path, Point nextStep) {
+        Point head = board.getHead();
+        Point apple = board.getApples().get(0);
+        List<Dijkstra.Vertex> graphMocked = new ArrayList<Dijkstra.Vertex>(this.graph);
+        LinkedList<Point> pathMocked = new LinkedList<>(path);
+        List<Dijkstra.Vertex> pathInVertexes = pathMocked.stream().map((point) -> new Dijkstra.Vertex(point)).collect(Collectors.toList());
+        pathInVertexes.remove(new Dijkstra.Vertex(head));
+        graphMocked.removeAll(pathInVertexes);
+//        ArrayList<Point> snake = new ArrayList<>(board.getSnake());
+//                    snake.subList()
+        Dijkstra.Vertex appleMocked = graphMocked.stream().filter((v) -> v.point.equals(apple)).findFirst().orElse(null);
 
+
+        Set<Dijkstra.Vertex> visited = new HashSet<>();
+        int vertCount = countSubVertexes(appleMocked, visited);
+        if (vertCount > 30) {
+            return true;
+        }
+
+        return false;
+    }
     public String finalizeDirection(Point nextStep) {
         Point head = this.board.getHead();
         String dir = null;
@@ -339,21 +349,6 @@ public class YourSolver implements Solver<Board> {
         return dir;
     }
 
-//    public String finalizeIfNoPathFound() {
-//        // Eсли не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
-//        Point head = board.getHead();
-//        String dir = null;
-//        if (this.board.isAt(head.getX() - 1, head.getY(), Elements.NONE)) {
-//            dir = Direction.LEFT.toString();
-//        } else if (this.board.isAt(head.getX() + 1, head.getY(), Elements.NONE)) {
-//            dir = Direction.RIGHT.toString();
-//        } else if (this.board.isAt(head.getX(), head.getY() - 1, Elements.NONE)) {
-//            dir = Direction.DOWN.toString();
-//        } else {
-//            dir = Direction.UP.toString();
-//        }
-//        return dir;
-//    }
 
     public static void main(String[] args) {
         WebSocketRunner.runClient(

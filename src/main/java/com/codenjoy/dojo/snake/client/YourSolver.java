@@ -69,6 +69,10 @@ public class YourSolver implements Solver<Board> {
             this.path = getPath(destination);
             String dir = null;
 
+
+            Dijkstra.Vertex bestV = findBestDetour(head);
+            System.out.println("best V is:" + bestV.point);
+
             if (this.path.size() > 1) {
 //                System.out.println("this.path.size()= " + this.path.size());
 
@@ -164,6 +168,40 @@ public class YourSolver implements Solver<Board> {
         return new YourSolver.SnakeParams(snakeSmall, leftEndpoint, rightEndpoint);
     }
 
+    // сюда отправляем nextStep в случаях, когда пути к яблоку и камню не найдены и принимаем
+    public Dijkstra.Vertex findBestDetour(Point head) {
+
+        System.out.println("in findBestDetour()");
+        Dijkstra.Vertex headV = this.graph.stream().filter((v) -> v.point.equals(head)).findFirst().orElse(null);
+        System.out.println("headV found: " + headV.point);
+        Dijkstra.Vertex bestVertex = null;
+        int totalVertexesFound = 0;
+        for (Dijkstra.Edge e : headV.edges) {
+//берем у головы все её три смежные вершины и, в цикле ищем, для какой вершины будет макс.число totalVertexesFound. Эту вершины и возвращаем как bestVertex
+//            System.out.println("inside of for-loop");
+            System.out.println("checking sub-vertex: " + e.v.point);
+            int vertCount = countSubVertexes(e.v);
+            System.out.println("a headBranch "+ e.v.point +" has " +vertCount + " sub-branches");
+            if (vertCount > totalVertexesFound) {
+                totalVertexesFound = vertCount;
+                bestVertex = e.v;
+            }
+        }
+        bestVertex = headV; //TODO удалить эту строчку!
+        System.out.println("exiting findBestDetour.  Возвращаем bestVertex= " + bestVertex.point);
+        return bestVertex;
+    }
+
+    int countSubVertexes(Dijkstra.Vertex current) {
+        if(current==null || current.visited) return 0;
+        current.visited = true;
+        int vertexCounter = 1;
+        for (Dijkstra.Edge e : current.edges) {
+            vertexCounter = countSubVertexes(e.v);
+        }
+        return vertexCounter;
+    }
+
     public List<Dijkstra.Vertex> createGraph(Board board, boolean isRockIncluded) {
         System.out.println("in createGraph");
         List<Dijkstra.Vertex> graph;
@@ -243,20 +281,17 @@ public class YourSolver implements Solver<Board> {
         String dir = null;
 
         // если унюхали поблизости яблоко -хватаем его!
-        if ( (Math.abs(head.getX() - apple.getX()) < 15) //длина "нюха" по оси Х
+        if ((Math.abs(head.getX() - apple.getX()) < 15) //длина "нюха" по оси Х
 //                && Math.abs(head.getY() - apple.getY()) == 0 // длина "нюха" по оси Y -нулевая, либо:
                 && (Math.abs(head.getY() - apple.getY()) < 1) //длина "нуха" по оси Y
 //                && (board.getSnakeDirection().equals(Direction.RIGHT.toString())
 //                || board.getSnakeDirection().equals(Direction.LEFT.toString()))
 
 
-        || Math.abs( head.getY() - apple.getY()) > 5 //либо прямой ход далее работает, когда расстояние по Y более указанного
+                || Math.abs(head.getY() - apple.getY()) > 5 //либо прямой ход далее работает, когда расстояние по Y более указанного
         ) {
             nextStep = path.get(1);
-        }
-
-
-        else //иначе проверяем
+        } else //иначе проверяем
             // складываем змейку в змеевик
             if (board.isAt(head.getX() - 1, head.getY(), Elements.NONE, Elements.GOOD_APPLE)
                     && head.getX() > leftEndpoint

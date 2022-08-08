@@ -15,6 +15,7 @@ public class Dijkstra {
         double minWeight;
         Set<Edge> edges;
         Vertex prev;
+        boolean visited = false; //используется не в Дейкстре, а в DFS расчете возможных ходов "вглубину", когда не найдены пути и змейке нужно выпутываться
 
         public Vertex(Point p) {
             this.point = p;

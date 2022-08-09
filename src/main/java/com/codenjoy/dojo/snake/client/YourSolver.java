@@ -61,69 +61,64 @@ public class YourSolver implements Solver<Board> {
 
             Dijkstra.Vertex headVertexInStoneGraph = getTargetFromGraph(graphStone, head);
             Dijkstra.computeGraph(headVertexInStoneGraph);
-//            System.out.println("graphApple: \n"+graphApple);
-//            System.out.println("graphStone: \n"+graphStone);
             Dijkstra.Vertex appleVertexInGraph = getTargetFromGraph(graphApple, apple);
             Dijkstra.Vertex stoneVertedInGraph = getTargetFromGraph(graphStone, stone);
 
             LinkedList<Point> pathToApple = Dijkstra.buildPath(appleVertexInGraph);
             LinkedList<Point> pathToStone = Dijkstra.buildPath(stoneVertedInGraph);
-            System.out.println("pathToApple: " + pathToApple);
-            System.out.println("pathToStone: " + pathToStone);
-//            System.out.println("appleVertexInGraph: " +appleVertexInGraph);
-//            System.out.println("stoneVertedInGraph: " +stoneVertedInGraph);
+//            System.out.println("pathToApple: " + pathToApple);
+//            System.out.println("pathToStone: " + pathToStone);
             int requiredVertexMinimum = 30; //минимальное кол-во вершин доступных для прохода по пути path в случае выхода после достижения яблока или камня
-            boolean isSteptoAppleAllowed = inspectForWayBack(board, pathToApple, apple, requiredVertexMinimum);
-            boolean isSteptoStoneAllowed = inspectForWayBack(board, pathToStone, stone, requiredVertexMinimum);
+//            boolean isSteptoAppleAllowed = inspectForWayBack(board, pathToApple, apple, requiredVertexMinimum);
+//            boolean isSteptoStoneAllowed = inspectForWayBack(board, pathToStone, stone, requiredVertexMinimum);
+//            System.out.println("isSteptoAppleAllowed: " + isSteptoAppleAllowed);
+//            System.out.println("isSteptoAppleAllowed: " + isSteptoAppleAllowed);
 
+            //-----------------блок управления режимом куда идти змейке------------------
 
+            // сначала описываем "плохие случаи", когда направляемся на камень:
             if (snake.size() > 50 // если змея опасно-громадная
                     && pathToStone.size() > 2 && pathToApple.size() > 2 // и существуют пути,
                     && pathToApple.size() * 2 > pathToStone.size() //и если яблоко не прямо рядом, то идем на камень
             ) {
                 currentPath = pathToStone;
                 target = stone;
-                System.out.println("target = stone");
+                System.out.println("snake is to large and needs reduction");
+                System.out.println("heading to: stone");
             } else if (pathToApple.size() < 2) {
                 currentPath = pathToStone;
                 target = stone;
-                System.out.println("target = stone");
-            } else {
+                System.out.println("path to apple is empty!");
+                System.out.println("heading to: stone");
+            } else if (pathToApple.size() < 2 && pathToStone.size() < 2) {//если не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
+                Point bestV = findBestDetour(head);
+                System.out.println("best V is:" + bestV);
+                nextStep = bestV;
+
+            } else { //и, в самом ХОРОШЕМ случае, направляемся на яблоко
                 currentPath = pathToApple;
                 target = apple;
-                System.out.println("target = apple");
+                System.out.println("heading to: apple");
             }
-            System.out.println("currentPath: " + currentPath);
-
-            if (this.currentPath.size() > 1) { // по длине змейки получаем нужные params для задания режима дальнейшей работы
-                YourSolver.SnakeParams modeParams = getSnakeParams(board.getSnake().size());
-
-                // режим прямого поиска яблока по Дейкстре (пока змейка маленькая):
-                if (modeParams.snakeSmall) {
-                    System.out.println("змея короче чем smallEndPoint");
-                    nextStep = getDirection(this.board, this.currentPath);
-
-                } else {// режим скручивания в змеевик (когда змейка подросла):
-                    System.out.println("змея длиннее чем smallEndPoint");
-                    nextStep = getZdirection(
-                            this.board, this.currentPath, target, modeParams.leftEndpoint, modeParams.rightEndpoint);
-                }
-
-                // TODO пересмотреть и возможно убрать, т.к. это предусмотрено в начале метода .get
-            } else // Если не найден путь к яблоку (в пути только один элемент -голова змеи) - направляемся к камню. Для этого нужно переформировать graph вставив туда камень вместо яблока
-            {
-                this.currentPath = pathToStone;
-                if (this.currentPath.size() > 1) { // если найден путь хотя бы к камню - идём на камень
-                    nextStep = getDirection(board, this.currentPath);
+            System.out.println("chosen currentPath: " + currentPath);
 
 
-                } else {//иначе, если не найден путь ни к яблоку, ни к камню - шаг на любую ближайшую пустую клетку
-                    Point bestV = findBestDetour(head);
-                    System.out.println("best V is:" + bestV);
-                    nextStep = bestV;
+            //----------------блок выбора режима прохода, в зависимости от длины змеи:
+            // по длине змейки получаем нужные params для задания режима дальнейшей работы
+            YourSolver.SnakeParams modeParams = getSnakeParams(board.getSnake().size());
 
-                }
+            // режим прямого поиска яблока по Дейкстре (пока змейка маленькая):
+            if (modeParams.snakeSmall) {
+                System.out.println("змея короче чем smallEndPoint");
+                nextStep = getDirection(this.board, this.currentPath);
+
+            } else {// режим скручивания в змеевик (когда змейка подросла):
+                System.out.println("змея длиннее чем smallEndPoint");
+                nextStep = getZdirection(
+                        this.board, this.currentPath, target, modeParams.leftEndpoint, modeParams.rightEndpoint);
             }
+            //------------конец блока выбора режима прохода в зав-ти от длины змеи
+
 
             System.out.println("nextStep: " + nextStep);
             dir = finalizeDirection(nextStep);
@@ -307,7 +302,7 @@ public class YourSolver implements Solver<Board> {
 
     //---------------------finalized methods------------------------
     public Dijkstra.Vertex getTargetFromGraph(List<Dijkstra.Vertex> graphTemp, Point target) {
-             return graphTemp.stream().filter(
+        return graphTemp.stream().filter(
                         (v) -> (v.point.equals(target)))
                 .findFirst().orElse(null);
     }

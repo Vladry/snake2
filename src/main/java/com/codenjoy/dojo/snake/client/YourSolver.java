@@ -33,13 +33,12 @@ public class YourSolver implements Solver<Board> {
     }
 
     @Override
-    //стр.281- настройка расстояния Y начала скрутки в змеевик
     public String get(Board board) {
         this.board = board;
         Point head = board.getHead();
         Point apple = board.getApples().get(0);
         Point stone = board.getStones().get(0);
-        List<Point> snake = board.getSnake();
+        LinkedList<Point> snake = (LinkedList) board.getSnake();
         Point tail = snake.get(snake.size() - 1);
         System.out.println("tail at: "+ tail);
 //        System.out.println(board.toString());
@@ -47,6 +46,11 @@ public class YourSolver implements Solver<Board> {
 //        List<Point> walls = board.getWalls();
 //        double dist = head.distance(apple);
 //        int headX = head.getX();
+//        double head.distance(point);
+        // Direction  head.direction(point)
+//        board.getSnakeDirection()
+
+
         if (board.isGameOver()) {
             return Direction.UP.toString();
         }
@@ -90,32 +94,32 @@ public class YourSolver implements Solver<Board> {
 
             // сначала описываем "плохие случаи", когда направляемся на камень:
             if (snake.size() > 50 // если змея опасно-громадная
-                    && pathToStone.size() > 2 && pathToApple.size() > 2 // и существуют пути,
+                    && pathToStone.size() > 0 && pathToApple.size() > 0 // и существуют пути,
                     && pathToApple.size() * 2 > pathToStone.size() //и если яблоко не прямо рядом, то идем на камень
             ) {//направляемся на камень
                 currentPath = pathToStone;
                 target = stone;
-                System.out.println("snake is to large and needs reduction");
+                System.out.println("snake is to large");
                 System.out.println("heading to: stone");
-            } else if (pathToApple.size() < 2 && pathToStone.size() >= 2) {
+            } else if (pathToApple.isEmpty() && pathToStone.size() > 0) {
                 //если нет пути к яблоку, направляемся на камень
                 currentPath = pathToStone;
                 target = stone;
                 System.out.println("path to apple is empty!");
                 System.out.println("heading to: stone");
             }
-            else if (pathToApple.size() < 2 && pathToStone.size() < 2) {
+            else if (pathToApple.isEmpty() && pathToStone.isEmpty()) {
                 //если нет пути ни к яблоку, ни к камню, направляемся на свой хвост
                 currentPath = pathToTail;
                 target = tail;
                 System.out.println("pathes to apple and stone are empty!");
                 System.out.println("heading to: tail");
-            } else if (pathToApple.size() >= 2){ //и, в самом ХОРОШЕМ случае, направляемся на яблоко
+            } else if (pathToApple.size() > 0){ //и, в самом ХОРОШЕМ случае, направляемся на яблоко
                 currentPath = pathToApple;
                 target = apple;
-                System.out.println("heading to: apple");
+                System.out.println("path to apple found,\n heading to: apple");
             }
-            else if(pathToApple.size() < 2 && pathToStone.size() < 2 && pathToTail.size() < 2) {//направляемся "куда-ни-будь"
+            else if(pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty()) {//направляемся "куда-ни-будь"
                 Point bestV = findBestDetour(head);
                 System.out.println("best V is:" + bestV);
                 nextStep = bestV;
@@ -176,10 +180,13 @@ public class YourSolver implements Solver<Board> {
         //ниже задаются эндпоинты для длин змеи, при которых переключаются режимы работы алгоритма скручивания в змеевик:
         int mediumStartPoint = 30;
         int largeStartPoint = 40;
+        /* расстояние прямого подхода головы к яблоку перед началом скручивания. Если 0, то скручивается еще на дальнем расстоянии от яблока
+        Голова подойдет к яблоку на расстояние proximity, потом начнет скручиваться в змеевик.
+        Можно это перевернуть, изменив знак на "head<target как здесь: if (Math.abs(head.getY() - target.getY()) < proximity
+        Тогда proximity будет означать что голова сначала скрутится, а потом бросится к яблоку с расстояния proximity.*/
         int proximity = 6;
-        // ограничители скручивания змейки в змеевик в зависимости от длины змейки snakeLength (snakeSize)
-        int leftEndpoint = 1;
-        int rightEndpoint = this.board.size() - 1;
+        int leftEndpoint = 1;//левая граница скручивания
+        int rightEndpoint = this.board.size() - 1; //правая граница скручивания
 
         if (snakeLength > mediumStartPoint
                 && snakeLength < largeStartPoint) {
@@ -237,7 +244,7 @@ public class YourSolver implements Solver<Board> {
 
     public Point getDirection(Board board, LinkedList<Point> path) {
         Point head = board.getHead();
-        Point nextStep = path.get(1);
+        Point nextStep = path.get(0);
         return nextStep;
     }
 
@@ -248,9 +255,9 @@ public class YourSolver implements Solver<Board> {
         String dir = null;
 
         // если унюхали поблизости яблоко -хватаем его!
-        if (Math.abs(head.getY() - target.getY()) > proximity ////длина "нюха" по оси Y: прямой ход по Дейкстре разрешен без скрутки в змеевик, пока Y более proximity
+        if (Math.abs(head.getY() - target.getY()) < proximity ////длина "нюха" по оси Y: прямой ход по Дейкстре разрешен без скрутки в змеевик, пока Y более proximity
         ) {
-            nextStep = path.get(1);
+            nextStep = path.get(0);
         } else //иначе проверяем
             // складываем змейку в змеевик
             if (board.isAt(head.getX() - 1, head.getY(), Elements.NONE, Elements.GOOD_APPLE)
@@ -303,7 +310,7 @@ public class YourSolver implements Solver<Board> {
             ) {
                 nextStep = new PointImpl(head.getX() + 1, head.getY());
             } else {
-                nextStep = path.get(1);
+                nextStep = path.get(0);
             }
         return nextStep;
     }
@@ -500,9 +507,10 @@ public class YourSolver implements Solver<Board> {
             if (this.board.isAt(up, Elements.NONE) || this.board.isAt(up, Elements.GOOD_APPLE)
                     || this.board.isAt(up, Elements.BAD_APPLE)
 
-            || this.board.isAt(up, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT,
-                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL, Elements.TAIL_END_RIGHT,
-                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP)
+            || this.board.isAt(up, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
+//                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL,
+//                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP
+            )
 
 
 
@@ -516,9 +524,10 @@ public class YourSolver implements Solver<Board> {
             if (this.board.isAt(down, Elements.NONE) || this.board.isAt(down, Elements.GOOD_APPLE)
                     || this.board.isAt(down, Elements.BAD_APPLE)
 
-            || this.board.isAt(down, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT,
-                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL, Elements.TAIL_END_RIGHT,
-                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP)
+            || this.board.isAt(down, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
+//                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL,
+//                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP
+            )
 
             ) {
                 graph.stream().filter((c) ->
@@ -531,9 +540,10 @@ public class YourSolver implements Solver<Board> {
             if (this.board.isAt(left, Elements.NONE) || this.board.isAt(left, Elements.GOOD_APPLE)
                     || this.board.isAt(left, Elements.BAD_APPLE)
 
-            || this.board.isAt(left, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT,
-            Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL, Elements.TAIL_END_RIGHT,
-                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP)
+            || this.board.isAt(left, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
+//                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL,
+//                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP
+            )
 
 
             ) {
@@ -547,9 +557,10 @@ public class YourSolver implements Solver<Board> {
             if (this.board.isAt(right, Elements.NONE) || this.board.isAt(right, Elements.GOOD_APPLE)
                     || this.board.isAt(right, Elements.BAD_APPLE)
 
-            || this.board.isAt(right, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT,
-                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL, Elements.TAIL_END_RIGHT,
-                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP)
+            || this.board.isAt(right, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
+//                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL,
+//                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP
+            )
 
 
 

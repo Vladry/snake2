@@ -40,12 +40,13 @@ public class YourSolver implements Solver<Board> {
         Point head = board.getHead();
         Point apple = board.getApples().get(0);
         Point stone = board.getStones().get(0);
-        List<Point> snake = board.getSnake();
+        List<Point> snake = new ArrayList<>();
+        snake.addAll(board.getSnake());
         LinkedList<Point> arrangedSnake = arrangeSnake(snake);
         System.out.println("arranged snake: " + arrangedSnake);
         Point tail = apple;
-        if(!arrangedSnake.isEmpty()) {
-            arrangedSnake.get(arrangedSnake.size() - 1);
+        if (!arrangedSnake.isEmpty()) {
+            tail = arrangedSnake.get(arrangedSnake.size() - 1);
         }
         System.out.println("tail at: " + tail);
 //        System.out.println(board.toString());
@@ -62,7 +63,7 @@ public class YourSolver implements Solver<Board> {
             return Direction.UP.toString();
         }
 
-        try {
+//        try {
             Point nextStep = null;
             String dir = null;
             Point target = null;
@@ -88,6 +89,9 @@ public class YourSolver implements Solver<Board> {
             LinkedList<Point> pathToApple = Dijkstra.buildPath(appleVertexInGraph);
             LinkedList<Point> pathToStone = Dijkstra.buildPath(stoneVertexInGraph);
             LinkedList<Point> pathToTail = Dijkstra.buildPath(tailVertexInGraph);
+            if (pathToTail.size() >= 1) {
+                pathToTail.removeLast(); // сам конец хвоста удаляем, чтобы самого-себя не укусить!
+            }
             System.out.println("pathToApple: " + pathToApple);
             System.out.println("pathToStone: " + pathToStone);
             System.out.println("pathToTail: " + pathToTail);
@@ -123,36 +127,20 @@ public class YourSolver implements Solver<Board> {
                 target = tail;
                 System.out.println("pathes to apple and stone are empty!");
                 System.out.println("heading to: tail");
+            } else if (pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty()) {//направляемся "куда-ни-будь"
+                System.out.println("Paths to apple, stone and tail are empty!");
+
+                currentPath = null;
+                target = null;
             } else if (pathToApple.size() > 0) { //и, в самом ХОРОШЕМ случае, направляемся на яблоко
                 currentPath = pathToApple;
                 target = apple;
                 System.out.println("path to apple found,\n heading to: apple");
-            } else if (pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty()) {//направляемся "куда-ни-будь"
-                System.out.println("Paths to apple, stone and tail are empty!");
-                Point bestV = findBestDetour(head);
-                System.out.println("best V is:" + bestV);
-                nextStep = bestV;
-
-            } else
-                System.out.println("chosen currentPath: " + currentPath);
-
-
-            //----------------блок выбора режима прохода, в зависимости от длины змеи:
-            // по длине змейки получаем нужные params для задания режима дальнейшей работы
-            YourSolver.SnakeParams modeParams = getSnakeParams(board.getSnake().size());
-
-            // режим прямого поиска яблока по Дейкстре (пока змейка маленькая):
-            if (modeParams.snakeSmall) {
-                System.out.println("змея короче чем smallEndPoint");
-                nextStep = getDirection(this.board, this.currentPath);
-
-            } else {// режим скручивания в змеевик (когда змейка подросла):
-                System.out.println("змея длиннее чем smallEndPoint");
-                nextStep = getZdirection(
-                        this.board, this.currentPath, target, modeParams.proximity, modeParams.leftEndpoint, modeParams.rightEndpoint);
             }
-            //------------конец блока выбора режима прохода в зав-ти от длины змеи
+            System.out.println("chosen currentPath: " + currentPath);
 
+
+            nextStep = chooseMovementMode(currentPath, target);
 
             System.out.println("nextStep: " + nextStep);
             dir = finalizeDirection(nextStep, stoneAllowed);
@@ -160,10 +148,10 @@ public class YourSolver implements Solver<Board> {
             System.out.println("direction before quitting:  " + dir);
             return dir;
 
-        } catch (Exception e) {
-            System.out.println("общее исключение .get()");
-            return Direction.DOWN.toString();
-        }
+//        } catch (Exception e) {
+//            System.out.println("общее исключение .get()");
+//            return Direction.DOWN.toString();
+//        }
     }
 
     // -------------------методы--------------------------
@@ -180,6 +168,31 @@ public class YourSolver implements Solver<Board> {
             this.leftEndpoint = leftEndpoint;
             this.rightEndpoint = rightEndpoint;
         }
+    }
+
+    public Point chooseMovementMode(List<Point> currentPath, Point target) {
+        Point nextStep = null;
+        if (currentPath.isEmpty() || target == null) {
+            nextStep = findBestDetour(this.board.getHead());
+            System.out.println("best V is:" + nextStep);
+            return nextStep;
+        }
+        //----------------блок выбора режима прохода, в зависимости от длины змеи:
+        // по длине змейки получаем нужные params для задания режима дальнейшей работы
+        YourSolver.SnakeParams modeParams = getSnakeParams(board.getSnake().size());
+
+        // режим прямого поиска яблока по Дейкстре (пока змейка маленькая):
+        if (modeParams.snakeSmall) {
+            System.out.println("змея короче чем smallEndPoint");
+            nextStep = getDirection(this.board, this.currentPath);
+
+        } else {// режим скручивания в змеевик (когда змейка подросла):
+            System.out.println("змея длиннее чем smallEndPoint");
+            nextStep = getZdirection(
+                    this.board, this.currentPath, target, modeParams.proximity, modeParams.leftEndpoint, modeParams.rightEndpoint);
+        }
+        //------------конец блока выбора режима прохода в зав-ти от длины змеи
+        return nextStep;
     }
 
     public YourSolver.SnakeParams getSnakeParams(int snakeLength) {
@@ -253,7 +266,10 @@ public class YourSolver implements Solver<Board> {
 
     public Point getDirection(Board board, LinkedList<Point> path) {
         Point head = board.getHead();
-        Point nextStep = path.get(0);
+        Point nextStep = null;
+        if(!path.isEmpty()){
+            nextStep = path.get(0);
+        }
         return nextStep;
     }
 
@@ -411,15 +427,16 @@ public class YourSolver implements Solver<Board> {
 
     public LinkedList<Point> arrangeSnake(List<Point> snake) {
         System.out.println("in arrangeSnake");
-        if (snake.isEmpty()) {
-            System.out.println("snake is empty! Exiting arrangeSnake");
-            return null;
+        if (snake == null || snake.isEmpty()) {
+            System.out.println("snake is empty or null! Exiting arrangeSnake");
+            return new LinkedList<>();
         }
-        List<Point> snakeDisposableElements = new ArrayList<Point>(snake);
+        List<Point> snakeElements = new ArrayList<Point>();
+        snakeElements.addAll(snake);
 
         Point head = null;
-        if (!snakeDisposableElements.isEmpty()) {
-            head = snakeDisposableElements.remove(0);
+        if (!snakeElements.isEmpty()) {
+            head = snakeElements.remove(0);
         }
         LinkedList<Point> result = new LinkedList<>();
         result.add(head);
@@ -427,27 +444,35 @@ public class YourSolver implements Solver<Board> {
         System.out.println("before entering while");
 
         //----------------------------------------
-        int counter = 0;
-        while (!snakeDisposableElements.isEmpty() && counter < 200) { //TODO был случай входа здесь в бесконечный цикл сразу вы выходами из fillY, fillX
-            fillY(snakeDisposableElements, result);
-            fillX(snakeDisposableElements, result);
-            counter++;
+//        int counter = 0;
+        /* Аварийный counter нужет потом, что когда змейка уходит с доски или себя кусает нарушается связность ее звеньев (голова смещается внуть тела), поэтому тут входим бесконечн.цикл
+         * То есть, не опустошается snakeElements.  Еще есть вариант сравнивать его длину ДО и ПОСЛЕ цикла и, если не изменилась длина- то выходим*/
+        boolean snakeElementsLengthChanged = true;
+//        while (!snakeElements.isEmpty() && counter < 100) {
+        while (!snakeElements.isEmpty() && snakeElementsLengthChanged) {
+            int snakeElementsOldSize = snakeElements.size();
+            fillY(snakeElements, result);
+            fillX(snakeElements, result);
+            if (snakeElements.size() == snakeElementsOldSize) {
+                snakeElementsLengthChanged = false;
+            }
+//            counter++;
         }
         System.out.println("exited while");
         return result;
     }
 
-    public void fillY(List<Point> snakeDisposableElements, LinkedList<Point> result) {
+    public void fillY(List<Point> snakeElements, LinkedList<Point> result) {
         System.out.println("in fillY");
         Point startElem;
-        if (result.isEmpty() || snakeDisposableElements.isEmpty()) {
+        if (result.isEmpty() || snakeElements.isEmpty()) {
             return;
         } else {
             startElem = result.get(result.size() - 1);
         }
 
 
-        List<Point> sameXs = snakeDisposableElements.stream().filter((el) -> el.getX() == startElem.getX()).collect(Collectors.toList());
+        List<Point> sameXs = snakeElements.stream().filter((el) -> el.getX() == startElem.getX()).collect(Collectors.toList());
         if (sameXs.isEmpty()) return;
         boolean doIt = true;
         while (doIt) {
@@ -455,7 +480,7 @@ public class YourSolver implements Solver<Board> {
             Point newP = sameXs.stream().filter((el) -> Math.abs(el.getY() - y) == 1).findFirst().orElse(null);
 
             if (newP != null) {
-                snakeDisposableElements.remove(newP);
+                snakeElements.remove(newP);
                 sameXs.remove(newP);
                 result.add(newP);
             } else {
@@ -464,17 +489,17 @@ public class YourSolver implements Solver<Board> {
         }
     }
 
-    public void fillX(List<Point> snakeDisposableElements, LinkedList<Point> result) {
+    public void fillX(List<Point> snakeElements, LinkedList<Point> result) {
         System.out.println("in fillX");
         Point startElem;
-        if (result.isEmpty() || snakeDisposableElements.isEmpty()) {
+        if (result.isEmpty() || snakeElements.isEmpty()) {
             return;
         } else {
             startElem = result.get(result.size() - 1);
         }
 
 
-        List<Point> sameYs = snakeDisposableElements.stream().filter((el) -> el.getY() == startElem.getY()).collect(Collectors.toList());
+        List<Point> sameYs = snakeElements.stream().filter((el) -> el.getY() == startElem.getY()).collect(Collectors.toList());
         if (sameYs.isEmpty()) return;
         boolean doIt = true;
         while (doIt) {
@@ -482,7 +507,7 @@ public class YourSolver implements Solver<Board> {
             Point newP = sameYs.stream().filter((el) -> Math.abs(el.getX() - y) == 1).findFirst().orElse(null);
 
             if (newP != null) {
-                snakeDisposableElements.remove(newP);
+                snakeElements.remove(newP);
                 sameYs.remove(newP);
                 result.add(newP);
             } else {

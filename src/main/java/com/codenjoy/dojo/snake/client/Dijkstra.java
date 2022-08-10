@@ -102,7 +102,9 @@ public class Dijkstra {
         for (; current != null; current = current.prev) {
             path.push(current.point);
         }
-        path.pop();//удалили из пути голову
+        if(!path.isEmpty()){
+            path.pop();//удалили из пути голову
+        }
         return path;
     }
 

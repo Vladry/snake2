@@ -7,7 +7,9 @@ import com.codenjoy.dojo.snake.model.Elements;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static scala.collection.immutable.Nil.head;
 
@@ -38,9 +40,14 @@ public class YourSolver implements Solver<Board> {
         Point head = board.getHead();
         Point apple = board.getApples().get(0);
         Point stone = board.getStones().get(0);
-        LinkedList<Point> snake = (LinkedList) board.getSnake();
-        Point tail = snake.get(snake.size() - 1);
-        System.out.println("tail at: "+ tail);
+        List<Point> snake = board.getSnake();
+        LinkedList<Point> arrangedSnake = arrangeSnake(snake);
+        System.out.println("arranged snake: " + arrangedSnake);
+        Point tail = apple;
+        if(!arrangedSnake.isEmpty()) {
+            arrangedSnake.get(arrangedSnake.size() - 1);
+        }
+        System.out.println("tail at: " + tail);
 //        System.out.println(board.toString());
 //        List<Point> barriers = board.getBarriers();
 //        List<Point> walls = board.getWalls();
@@ -59,6 +66,7 @@ public class YourSolver implements Solver<Board> {
             Point nextStep = null;
             String dir = null;
             Point target = null;
+            boolean stoneAllowed = false;
             this.graphApple = createAppleGraph();
             this.graphStone = createStoneGraph();
             this.graphTail = createTailGraph();
@@ -100,32 +108,33 @@ public class YourSolver implements Solver<Board> {
                 currentPath = pathToStone;
                 target = stone;
                 System.out.println("snake is to large");
+                stoneAllowed = true;
                 System.out.println("heading to: stone");
             } else if (pathToApple.isEmpty() && pathToStone.size() > 0) {
                 //если нет пути к яблоку, направляемся на камень
                 currentPath = pathToStone;
                 target = stone;
                 System.out.println("path to apple is empty!");
+                stoneAllowed = true;
                 System.out.println("heading to: stone");
-            }
-            else if (pathToApple.isEmpty() && pathToStone.isEmpty()) {
-                //если нет пути ни к яблоку, ни к камню, направляемся на свой хвост
+            } else if (pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.size() > 0) {
+                //если нет пути ни к яблоку, ни к камню, но есть проход к хвосту- направляемся на свой хвост
                 currentPath = pathToTail;
                 target = tail;
                 System.out.println("pathes to apple and stone are empty!");
                 System.out.println("heading to: tail");
-            } else if (pathToApple.size() > 0){ //и, в самом ХОРОШЕМ случае, направляемся на яблоко
+            } else if (pathToApple.size() > 0) { //и, в самом ХОРОШЕМ случае, направляемся на яблоко
                 currentPath = pathToApple;
                 target = apple;
                 System.out.println("path to apple found,\n heading to: apple");
-            }
-            else if(pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty()) {//направляемся "куда-ни-будь"
+            } else if (pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty()) {//направляемся "куда-ни-будь"
+                System.out.println("Paths to apple, stone and tail are empty!");
                 Point bestV = findBestDetour(head);
                 System.out.println("best V is:" + bestV);
                 nextStep = bestV;
 
             } else
-            System.out.println("chosen currentPath: " + currentPath);
+                System.out.println("chosen currentPath: " + currentPath);
 
 
             //----------------блок выбора режима прохода, в зависимости от длины змеи:
@@ -146,7 +155,7 @@ public class YourSolver implements Solver<Board> {
 
 
             System.out.println("nextStep: " + nextStep);
-            dir = finalizeDirection(nextStep);
+            dir = finalizeDirection(nextStep, stoneAllowed);
 //----------------------конец ------------------------
             System.out.println("direction before quitting:  " + dir);
             return dir;
@@ -208,10 +217,10 @@ public class YourSolver implements Solver<Board> {
     }
 
     public Point findBestDetour(Point head) {
+        System.out.println("in findBestDetour");
         // сюда отправляем nextStep в случаях, когда пути к яблоку и камню не найдены
-        System.out.println("in findBestDetour()");
         Dijkstra.Vertex headV = this.graphApple.stream().filter((v) -> v.point.equals(head)).findFirst().orElse(null);
-        System.out.println("headV found: " + headV.point);
+//        System.out.println("headV found: " + headV.point);
         Dijkstra.Vertex bestVertex = null;
         int totalVertexesFound = 0;
         for (Dijkstra.Edge e : headV.edges) {
@@ -227,7 +236,7 @@ public class YourSolver implements Solver<Board> {
                 bestVertex = e.v;
             }
         }
-        System.out.println("exiting findBestDetour.  Возвращаем bestVertex= " + bestVertex.point);
+//        System.out.println("exiting findBestDetour.  Возвращаем bestVertex= " + bestVertex.point);
         return bestVertex.point;
     }
 
@@ -337,37 +346,150 @@ public class YourSolver implements Solver<Board> {
         return false;
     }
 
-    public String finalizeDirection(Point nextStep) {
+    public String finalizeDirection(Point nextStep, boolean stoneAllowed) {
         Point head = this.board.getHead();
         String dir = null;
+        Elements el = Elements.NONE;
+        Elements el2 = Elements.BAD_APPLE;
+        if (stoneAllowed) {
+            el = Elements.BAD_APPLE;
+        }
+        System.out.println();
+        System.out.print("in finalizeDirection: ");
+        System.out.print("head: " + head + ", ");
+        System.out.print("nextStep: " + nextStep + ", ");
+        System.out.print("stoneAllowed: " + stoneAllowed + ", ");
+        System.out.println("el = " + '\'' + el + '\'');
+//        System.out.println("el2 = "+'\''+ el2+'\'');
+
         if (nextStep.getX() > head.getX()
                 && nextStep.getY() == head.getY()
-                && ((board.isAt(head.getX() + 1, head.getY(), Elements.NONE)
-                || board.isAt(head.getX() + 1, head.getY(), Elements.GOOD_APPLE)))
+//                && (
+//                           board.isAt(head.getX() + 1, head.getY(), Elements.NONE)
+//                        || board.isAt(head.getX() + 1, head.getY(), Elements.GOOD_APPLE)
+//                        || board.isAt(head.getX() + 1, head.getY(), el)
+//        )
         ) {
             dir = Direction.RIGHT.toString();
         } else if (nextStep.getX() < head.getX()
                 && nextStep.getY() == head.getY()
-                && ((board.isAt(head.getX() - 1, head.getY(), Elements.NONE)
-                || board.isAt(head.getX() - 1, head.getY(), Elements.GOOD_APPLE)))
+//                && (
+//                board.isAt(head.getX() - 1, head.getY(), Elements.NONE)
+//                        || board.isAt(head.getX() - 1, head.getY(), Elements.GOOD_APPLE)
+//                        || board.isAt(head.getX() - 1, head.getY(), el)
+//
+//        )
         ) {
             dir = Direction.LEFT.toString();
         } else if (nextStep.getY() > head.getY()
                 && nextStep.getX() == head.getX()
-                && ((board.isAt(head.getX(), head.getY() + 1, Elements.NONE)
-                || board.isAt(head.getX(), head.getY() + 1, Elements.GOOD_APPLE)))
+//                && (
+//                board.isAt(head.getX() + 1, head.getY(), Elements.NONE)
+//                        || board.isAt(head.getX(), head.getY() + 1, Elements.GOOD_APPLE)
+//                        || board.isAt(head.getX(), head.getY() + 1, el)
+//        )
         ) {
             dir = Direction.UP.toString();
         } else if (nextStep.getY() < head.getY()
                 && nextStep.getX() == head.getX()
-                && ((board.isAt(head.getX(), head.getY() - 1, Elements.NONE)
-                || board.isAt(head.getX(), head.getY() - 1, Elements.GOOD_APPLE)))
+//                && (
+//                board.isAt(head.getX() + 1, head.getY(), Elements.NONE)
+//                        || board.isAt(head.getX(), head.getY() - 1, Elements.GOOD_APPLE)
+//                        || board.isAt(head.getX(), head.getY() - 1, el)
+//        )
         ) {
             dir = Direction.DOWN.toString();
         }
+
+
+        if (dir == null) {
+            dir = Direction.DOWN.toString();
+        } //TODO потом убрать эту временную "затычку"
         return dir;
     }
 
+
+    public LinkedList<Point> arrangeSnake(List<Point> snake) {
+        System.out.println("in arrangeSnake");
+        if (snake.isEmpty()) {
+            System.out.println("snake is empty! Exiting arrangeSnake");
+            return null;
+        }
+        List<Point> snakeDisposableElements = new ArrayList<Point>(snake);
+
+        Point head = null;
+        if (!snakeDisposableElements.isEmpty()) {
+            head = snakeDisposableElements.remove(0);
+        }
+        LinkedList<Point> result = new LinkedList<>();
+        result.add(head);
+
+        System.out.println("before entering while");
+
+        //----------------------------------------
+        int counter = 0;
+        while (!snakeDisposableElements.isEmpty() && counter < 200) { //TODO был случай входа здесь в бесконечный цикл сразу вы выходами из fillY, fillX
+            fillY(snakeDisposableElements, result);
+            fillX(snakeDisposableElements, result);
+            counter++;
+        }
+        System.out.println("exited while");
+        return result;
+    }
+
+    public void fillY(List<Point> snakeDisposableElements, LinkedList<Point> result) {
+        System.out.println("in fillY");
+        Point startElem;
+        if (result.isEmpty() || snakeDisposableElements.isEmpty()) {
+            return;
+        } else {
+            startElem = result.get(result.size() - 1);
+        }
+
+
+        List<Point> sameXs = snakeDisposableElements.stream().filter((el) -> el.getX() == startElem.getX()).collect(Collectors.toList());
+        if (sameXs.isEmpty()) return;
+        boolean doIt = true;
+        while (doIt) {
+            int y = result.get(result.size() - 1).getY();
+            Point newP = sameXs.stream().filter((el) -> Math.abs(el.getY() - y) == 1).findFirst().orElse(null);
+
+            if (newP != null) {
+                snakeDisposableElements.remove(newP);
+                sameXs.remove(newP);
+                result.add(newP);
+            } else {
+                doIt = false;
+            }
+        }
+    }
+
+    public void fillX(List<Point> snakeDisposableElements, LinkedList<Point> result) {
+        System.out.println("in fillX");
+        Point startElem;
+        if (result.isEmpty() || snakeDisposableElements.isEmpty()) {
+            return;
+        } else {
+            startElem = result.get(result.size() - 1);
+        }
+
+
+        List<Point> sameYs = snakeDisposableElements.stream().filter((el) -> el.getY() == startElem.getY()).collect(Collectors.toList());
+        if (sameYs.isEmpty()) return;
+        boolean doIt = true;
+        while (doIt) {
+            int y = result.get(result.size() - 1).getX();
+            Point newP = sameYs.stream().filter((el) -> Math.abs(el.getX() - y) == 1).findFirst().orElse(null);
+
+            if (newP != null) {
+                snakeDisposableElements.remove(newP);
+                sameYs.remove(newP);
+                result.add(newP);
+            } else {
+                doIt = false;
+            }
+        }
+    }
 
     //---------------------finalized methods------------------------
     public Dijkstra.Vertex getTargetFromGraph(List<Dijkstra.Vertex> graphTemp, Point target) {
@@ -487,9 +609,7 @@ public class YourSolver implements Solver<Board> {
     public List<Dijkstra.Vertex> createTailGraph() {
         List<Dijkstra.Vertex> graph;
         List<Point> snake = this.board.getSnake();
-        Point tail = snake.get(snake.size()-1);
-        System.out.println("in createTailGraph.  snake: "+snake);
-        System.out.println("in createTailGraph.  tail: "+tail);
+        Point tail = snake.get(snake.size() - 1);
         List<Point> freeSpace = this.board.get(Elements.NONE, Elements.GOOD_APPLE, Elements.BAD_APPLE);
 
         freeSpace.add(this.board.getHead());
@@ -507,11 +627,10 @@ public class YourSolver implements Solver<Board> {
             if (this.board.isAt(up, Elements.NONE) || this.board.isAt(up, Elements.GOOD_APPLE)
                     || this.board.isAt(up, Elements.BAD_APPLE)
 
-            || this.board.isAt(up, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
+                    || this.board.isAt(up, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
 //                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL,
 //                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP
             )
-
 
 
             ) {
@@ -524,7 +643,7 @@ public class YourSolver implements Solver<Board> {
             if (this.board.isAt(down, Elements.NONE) || this.board.isAt(down, Elements.GOOD_APPLE)
                     || this.board.isAt(down, Elements.BAD_APPLE)
 
-            || this.board.isAt(down, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
+                    || this.board.isAt(down, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
 //                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL,
 //                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP
             )
@@ -540,7 +659,7 @@ public class YourSolver implements Solver<Board> {
             if (this.board.isAt(left, Elements.NONE) || this.board.isAt(left, Elements.GOOD_APPLE)
                     || this.board.isAt(left, Elements.BAD_APPLE)
 
-            || this.board.isAt(left, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
+                    || this.board.isAt(left, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
 //                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL,
 //                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP
             )
@@ -557,11 +676,10 @@ public class YourSolver implements Solver<Board> {
             if (this.board.isAt(right, Elements.NONE) || this.board.isAt(right, Elements.GOOD_APPLE)
                     || this.board.isAt(right, Elements.BAD_APPLE)
 
-            || this.board.isAt(right, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
+                    || this.board.isAt(right, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
 //                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL,
 //                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP
             )
-
 
 
             ) {

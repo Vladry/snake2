@@ -39,14 +39,11 @@ public class YourSolver implements Solver<Board> {
     LinkedList<Point> pathToStone = new LinkedList<>();
     LinkedList<Point> pathToTail = new LinkedList<>();
     int cycleCounterBeforeWalkingToStone = 0;
-
-    boolean stoneAllowed = false;
-    boolean appleAllowed = true;
-    int requiredVertexMinimum = 50; //минимальное кол-во вершин доступных для прохода по пути path в случае выхода после достижения яблока или камня
+    int minimumReqAmntOfStepsAroundThePoint = 50; //минимальное кол-во вершин доступных для прохода по пути path в случае выхода после достижения яблока или камня
     int freeSpaceAroundApple = 0;
     int freeSpaceAroundStone = 0;
     int freeSpaceAroundTail = 0;
-
+    int maximumAllowedSnakeSize = 0;
     public YourSolver(Dice dice) {
         this.dice = dice;
     }
@@ -68,19 +65,8 @@ public class YourSolver implements Solver<Board> {
             tail = arrangedSnake.get(arrangedSnake.size() - 1);
         }
         System.out.println("tail at: " + tail);
-
-        //чем больше змея -тем ниже требования к мин. кол-ву свободных ходов (см. стр.45)
-        requiredVertexMinimum = 110 - arrangedSnake.size();
-
-//        System.out.println(board.toString());
-//        List<Point> barriers = board.getBarriers();
-//        List<Point> walls = board.getWalls();
-//        double dist = head.distance(apple);
-//        int headX = head.getX();
-//        double head.distance(point);
-        // Direction  head.direction(point)
-//        board.getSnakeDirection()
-
+        minimumReqAmntOfStepsAroundThePoint = 40;
+        maximumAllowedSnakeSize = 70;
 
         if (board.isGameOver()) {
             return Direction.UP.toString();
@@ -119,17 +105,8 @@ public class YourSolver implements Solver<Board> {
             System.out.println("pathToStone: " + pathToStone);
             System.out.println("pathToTail: " + pathToTail);
 
-//            boolean isAppleAllowed = isAppleAllowed(board, pathToApple, apple, requiredVertexMinimum);
-//            boolean isStoneAllowed = isAppleAllowed(board, pathToStone, stone, requiredVertexMinimum);
-//            System.out.println("isAppleAllowed: " + isSteptoAppleAllowed);
-//            System.out.println("isAppleAllowed: " + isSteptoAppleAllowed);
-
 
             //-----------------блок управления режимом куда идти змейке------------------
-
-            // сначала описываем "плохие случаи", когда направляемся на камень:
-
-
 //Здесь вся логика принятия решений КУДА идём. Тут много мутируем поля класса
             target = choosePathAndTarget();
 
@@ -150,118 +127,20 @@ public class YourSolver implements Solver<Board> {
     // -------------------методы--------------------------
 
     // Основной метод выбора направления движения, включает внутри себя decideIfWeGoToApple()
-    public Point choosePathAndTarget() {
-        Point target = null;
-        if (snake.size() > 100 // если змея опасно-громадная
-                && pathToStone.size() > 0 && pathToApple.size() > 0 // и существуют пути,
-                && pathToApple.size() * 2 > pathToStone.size() //и если яблоко не прямо рядом, то идем на камень
-        ) {//направляемся на камень
-            currentPath = pathToStone;
-            target = stone;
-            System.out.println("snake is to large");
-            stoneAllowed = true;
-            System.out.println("heading to: stone");
-        } else if (pathToApple.isEmpty() && pathToStone.size() > 0 && pathToTail.size() > 0) {
-            //если нет пути к яблоку- анализируем, идти ли нам на камень или еще погулять
-            System.out.println("path to apple is empty!");
-            Point probe = findBestDetour(head);
-            if (cycleCounterBeforeWalkingToStone < 5) {
-                cycleCounterBeforeWalkingToStone++;
-                System.out.println("heading to a probe point while counterDelayGoingToStone < 5");
-                currentPath = new LinkedList<>();
-                currentPath.add(probe);
-                target = probe;
-            } else {
-                System.out.println("heading to: stone because counterDelayGoingToStone is = " + cycleCounterBeforeWalkingToStone);
-                currentPath = pathToStone;
-                target = stone;
-            }
-        } else if (pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.size() > 0) {
-            //если нет пути ни к яблоку, ни к камню, но есть проход к хвосту- направляемся на свой хвост
-            currentPath = pathToTail;
-            target = tail;
-            System.out.println("pathes to apple and stone are empty!");
-            System.out.println("heading to: tail");
-        } else if (pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty()) {//направляемся "куда-ни-будь"
-            System.out.println("Paths to apple, stone and tail are empty!");
 
-            currentPath = new LinkedList<>();
-            target = null;
-        } else if (pathToApple.size() > 0) { //и, в самом ХОРОШЕМ случае, думаем  идти ли нам на на яблоко
-            target = decideIfWeGoToApple();//метод проверяет есть ли вокруг яблока достаточно места и решает, может пойти на хвост или на камень
-        }
-        System.out.println("chosen currentPath: " + currentPath);
+    public Point getSticky(Point bestVertex){
 
-        return target;
-    }
-
-
-    //метод проверяет есть ли вокруг яблока достаточно места и решает, может пойти на хвост или на камень
-    public Point decideIfWeGoToApple() {
-        Point target = null;
-        Set<Dijkstra.Vertex> visited = new HashSet<>();
-        Dijkstra.Vertex appleV = getTargetFromGraph(graphApple, apple);
-        freeSpaceAroundApple = countSpaceAround(appleV, visited);
-
-        if (freeSpaceAroundApple >= requiredVertexMinimum) {
-            currentPath = pathToApple;
-            target = apple;
-            System.out.println("path to apple found, freeSpaceAround >= requiredVertexMinimum\n heading to: apple");
-        } else {
-            System.out.println("path to apple found, but can't go for apple, as freeSpaceAround < requiredVertexMinimum");
-
-            if (!pathToTail.isEmpty()) {
-                //проверяем, не опасно ли пойти на хвост:
-                visited = new HashSet<>();
-                Dijkstra.Vertex tailV = getTargetFromGraph(graphApple, tail);
-                freeSpaceAroundTail = countSpaceAround(tailV, visited);
-//---- проверяем, безопасно ли пойти на хвост вместо яблока. Требуем, чтобы вокруг хвоста было ощутимо больше ходов:
-                if (freeSpaceAroundTail > freeSpaceAroundApple * 2) {
-                    currentPath = pathToTail;
-                    target = tail;
-                    System.out.println("path to apple found, freeSpaceAroundApple < requiredVertexMinimum\n heading to: tail");
-                } else if
-                (!pathToStone.isEmpty()) {
-                    //проверяем, не опасно ли пойти на хвост:
-                    visited = new HashSet<>();
-                    Dijkstra.Vertex stoneV = getTargetFromGraph(graphStone, tail);
-                    freeSpaceAroundTail = countSpaceAround(stoneV, visited);
-                    if (freeSpaceAroundTail > freeSpaceAroundApple * 2) {
-                        currentPath = pathToStone;
-                        target = stone;
-                        System.out.println("path to apple found, but little space around, path to tail found, but also little space around");
-                        System.out.println("path to stone found, space around stone is sufficient, heading to stone");
-                    }
-
-                } else { //если же альтернатив сьеданию яблока с плохоим freeSpaceAroundApple не найдена, таки идем на яблоко:
-                    currentPath = pathToApple;
-                    target = apple;
-                }
-            }
-        }
-        return target;
-    }
-
-    private class SnakeParams {
-        boolean snakeSmall;
-        // ограничители скручивания змейки в змеевик в зависимости от длины змейки snakeLength (snakeSize)
-        int proximity;
-        int leftEndpoint;
-        int rightEndpoint;
-
-        public SnakeParams(boolean snakeSmall, int proximity, int leftEndpoint, int rightEndpoint) {
-            this.snakeSmall = snakeSmall;
-            this.proximity = proximity;
-            this.leftEndpoint = leftEndpoint;
-            this.rightEndpoint = rightEndpoint;
-        }
+        return bestVertex;
     }
 
     public Point chooseMovementMode(List<Point> currentPath, Point target) {
         Point nextStep = null;
         if (currentPath.isEmpty() || target == null) {
-            nextStep = findBestDetour(this.board.getHead());
-            System.out.println("best V is:" + nextStep);
+            Point bestVertex = findBestDetour(this.board.getHead());
+
+            nextStep = getSticky(bestVertex);
+
+                    System.out.println("best V is:" + nextStep);
             return nextStep;
         }
         //----------------блок выбора режима прохода, в зависимости от длины змеи:
@@ -484,6 +363,114 @@ public class YourSolver implements Solver<Board> {
 
 
     //---------------------finalized methods------------------------
+    public Point choosePathAndTarget() {
+        Point target = null;
+
+        if (snake.size() > maximumAllowedSnakeSize // если змея опасно-громадная
+                && pathToStone.size() > 0 && pathToApple.size() > 0 // и существуют пути,
+                && pathToApple.size() * 2 > pathToStone.size() //и если яблоко не прямо рядом, то идем на камень
+        ) {//направляемся на камень
+            currentPath = pathToStone;
+            target = stone;
+            System.out.println("snake is to large");
+            System.out.println("heading to: stone");
+        } else if (pathToApple.isEmpty() && pathToStone.size() > 0 && pathToTail.size() > 0) {
+            //если нет пути к яблоку- анализируем, идти ли нам на камень или еще погулять
+            System.out.println("path to apple is empty!");
+            Point probe = findBestDetour(head);
+            if (cycleCounterBeforeWalkingToStone < 5) {
+                cycleCounterBeforeWalkingToStone++;
+                System.out.println("heading to a probe point while counterDelayGoingToStone < 5");
+                currentPath = new LinkedList<>();
+                currentPath.add(probe);
+                target = probe;
+            } else {
+                System.out.println("heading to: stone because counterDelayGoingToStone is = " + cycleCounterBeforeWalkingToStone);
+                currentPath = pathToStone;
+                target = stone;
+            }
+        } else if (pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.size() > 0) {
+            //если нет пути ни к яблоку, ни к камню, но есть проход к хвосту- направляемся на свой хвост
+            currentPath = pathToTail;
+            target = tail;
+            System.out.println("pathes to apple and stone are empty!");
+            System.out.println("heading to: tail");
+        } else if (pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty()) {//направляемся "куда-ни-будь"
+            System.out.println("Paths to apple, stone and tail are empty!");
+
+            currentPath = new LinkedList<>();
+            target = null;
+        } else if (pathToApple.size() > 0) { //и, в самом ХОРОШЕМ случае, думаем  идти ли нам на на яблоко
+            target = decideIfWeGoToApple();//метод проверяет есть ли вокруг яблока достаточно места и решает, может пойти на хвост или на камень
+        }
+        System.out.println("chosen currentPath: " + currentPath);
+
+        return target;
+    }
+
+
+    //метод проверяет есть ли вокруг яблока достаточно места и решает, может пойти на хвост или на камень
+    public Point decideIfWeGoToApple() {
+
+        Point target = null;
+        Set<Dijkstra.Vertex> visited = new HashSet<>();
+        Dijkstra.Vertex appleV = getTargetFromGraph(graphStone, apple);//нужно брать именно граф с камнем, т.к. камень мешает "видеть" выход к другим свободным местам
+        freeSpaceAroundApple = countSpaceAround(appleV, visited);
+
+        if (freeSpaceAroundApple >= minimumReqAmntOfStepsAroundThePoint) {
+            currentPath = pathToApple;
+            target = apple;
+            System.out.println("path to apple found, freeSpaceAround >= requiredVertexMinimum\n heading to: apple");
+        } else {
+            System.out.println("path to apple found, but can't go for apple, as freeSpaceAround < requiredVertexMinimum");
+
+            if (!pathToTail.isEmpty()) {
+                //проверяем, не опасно ли пойти на хвост:
+                visited = new HashSet<>();
+                Dijkstra.Vertex tailV = getTargetFromGraph(graphApple, tail);
+                freeSpaceAroundTail = countSpaceAround(tailV, visited);
+//---- проверяем, безопасно ли пойти на хвост вместо яблока. Требуем, чтобы вокруг хвоста было ощутимо больше ходов:
+                if (freeSpaceAroundTail > freeSpaceAroundApple * 2) {
+                    currentPath = pathToTail;
+                    target = tail;
+                    System.out.println("path to apple found, freeSpaceAroundApple < requiredVertexMinimum\n heading to: tail");
+                } else if
+                (!pathToStone.isEmpty()) {
+                    //проверяем, не опасно ли пойти на хвост:
+                    visited = new HashSet<>();
+                    Dijkstra.Vertex stoneV = getTargetFromGraph(graphStone, tail);
+                    freeSpaceAroundTail = countSpaceAround(stoneV, visited);
+                    if (freeSpaceAroundTail > freeSpaceAroundApple * 2) {
+                        currentPath = pathToStone;
+                        target = stone;
+                        System.out.println("path to apple found, but little space around, path to tail found, but also little space around");
+                        System.out.println("path to stone found, space around stone is sufficient, heading to stone");
+                    }
+
+                } else { //если же альтернатив сьеданию яблока с плохоим freeSpaceAroundApple не найдена, таки идем на яблоко:
+                    currentPath = pathToApple;
+                    target = apple;
+                }
+            }
+        }
+        return target;
+    }
+
+    private class SnakeParams {
+        boolean snakeSmall;
+        // ограничители скручивания змейки в змеевик в зависимости от длины змейки snakeLength (snakeSize)
+        int proximity;
+        int leftEndpoint;
+        int rightEndpoint;
+
+        public SnakeParams(boolean snakeSmall, int proximity, int leftEndpoint, int rightEndpoint) {
+            this.snakeSmall = snakeSmall;
+            this.proximity = proximity;
+            this.leftEndpoint = leftEndpoint;
+            this.rightEndpoint = rightEndpoint;
+        }
+    }
+
     public Point getDirection(Board board, LinkedList<Point> path) {
         Point head = board.getHead();
         Point nextStep = null;

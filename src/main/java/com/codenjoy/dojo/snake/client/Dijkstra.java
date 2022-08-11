@@ -54,10 +54,6 @@ public class Dijkstra {
             return String.format(str,
                     this.point, (this.prev != null) ? this.prev.point : "none", this.edges);
         }
-//        public String toString() {
-//            return String.format("Vert-> x: %d, y: %d \n", this.x, this.y);
-//        }
-
 
     }
 

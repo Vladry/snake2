@@ -9,8 +9,6 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import static scala.collection.immutable.Nil.head;
-
 /**
  * User: Vlad Ryab
  * pw: slyslysly
@@ -44,6 +42,7 @@ public class YourSolver implements Solver<Board> {
     int freeSpaceAroundStone = 0;
     int freeSpaceAroundTail = 0;
     int maximumAllowedSnakeSize = 0;
+    LinkedList<Point> arrangedSnake = new LinkedList<>();
 
     public YourSolver(Dice dice) {
         this.dice = dice;
@@ -59,14 +58,15 @@ public class YourSolver implements Solver<Board> {
         this.stone = board.getStones().get(0);
         snake = new ArrayList<>();
         this.snake.addAll(board.getSnake());
-        LinkedList<Point> arrangedSnake = arrangeSnake(snake);
-        System.out.println("snake.size(): " + snake.size());
-        System.out.println("arranged snake: " + arrangedSnake);
-        this.tail = apple; //временно, до переназначения назначим хвосту яблочко, шоб не було нулём
+        arrangedSnake = new LinkedList<>();//обязательно пересоздать, иначе добавляет новую змею в существующую старую змею
+        arrangedSnake.addAll(arrangeSnake(snake));
+
+
+        this.tail = null;
         if (!arrangedSnake.isEmpty()) {
             this.tail = arrangedSnake.get(arrangedSnake.size() - 1);
         }
-//        System.out.println("tail at: " + tail);
+
         minimumReqAmntOfStepsAroundThePoint = 40;
         maximumAllowedSnakeSize = 70;
 
@@ -82,49 +82,62 @@ public class YourSolver implements Solver<Board> {
             this.graphStone = createStoneGraph();
             this.graphTail = createTailGraph();
 
+
             Dijkstra.Vertex headVertexInAppleGraph = getTargetFromGraph(graphApple, head);
-            Dijkstra.computeGraph(headVertexInAppleGraph);
+            Dijkstra.computeGraph(headVertexInAppleGraph, null);
 
             Dijkstra.Vertex headVertexInStoneGraph = getTargetFromGraph(graphStone, head);
-            Dijkstra.computeGraph(headVertexInStoneGraph);
+            Dijkstra.computeGraph(headVertexInStoneGraph, null);
+
+
 
             Dijkstra.Vertex headVertexInTailGraph = getTargetFromGraph(graphTail, head);
-            Dijkstra.computeGraph(headVertexInTailGraph);
-//            System.out.println("headVertexInTailGraph: " +headVertexInTailGraph);
-//            System.out.println("graphTail: " + graphTail);
+            Dijkstra.computeGraph(headVertexInTailGraph, tail);
+
             Dijkstra.Vertex appleVertexInGraph = getTargetFromGraph(graphApple, apple);
             Dijkstra.Vertex stoneVertexInGraph = getTargetFromGraph(graphStone, stone);
             Dijkstra.Vertex tailVertexInGraph = getTargetFromGraph(graphTail, tail);
 
-            this.pathToApple = Dijkstra.buildPath(appleVertexInGraph);
-            this.pathToStone = Dijkstra.buildPath(stoneVertexInGraph);
-            this.pathToTail = Dijkstra.buildPath(tailVertexInGraph);
-
-            if (pathToTail.isEmpty()) {
-                System.out.println("pathToTail not found for tail: "+tail);
-                for (int i = arrangedSnake.size() - 1; i >= 2; i--) {
-                    tailVertexInGraph = getTargetFromGraph(graphTail, arrangedSnake.get(i));
-                    this.pathToTail = Dijkstra.buildPath(tailVertexInGraph);
-                    if (!pathToTail.isEmpty()) {
-                        System.out.println("pathToTail found for arrangedStake.get("+i+")");
-                        break;
-                    } else {
-                        System.out.println("for arrangedStake.get("+i+")  pathToTail not found");
-                    }
-                }
-            }
-
-            System.out.println("pathToTail:"+ pathToTail);
+            this.pathToApple = Dijkstra.buildPath(appleVertexInGraph, null);
+            this.pathToStone = Dijkstra.buildPath(stoneVertexInGraph, null);
+            this.pathToTail = Dijkstra.buildPath(tailVertexInGraph, tail);
+            System.out.println("pathToTail:" + pathToTail);
 
             if (pathToTail.size() >= 1) {
                 pathToTail.removeLast(); // сам конец хвоста удаляем, чтобы самого-себя не укусить!
-            }
-//            System.out.println("pathToApple: " + pathToApple);
-//            System.out.println("pathToStone: " + pathToStone);
-//            System.out.println("pathToTail: " + pathToTail);
-//            System.out.println("graphTail: " + graphTail);
+            } else {//TODO позднее сюда вставить поиск последней открытой для доступа части тела змеи
+//а сейчас здесь нужно поправить "глючный" graphTail. Для этого находим tail и насильно пере-линковываем ему все соседние точки.
+                System.out.println("т.к. pathToTail НЕ найден, зашли в ветку доработки graphTail!!!!");
+                if(tailVertexInGraph.prev==null){
+//                    System.out.println("было: tailVertexInGraph.adjs= "+tailVertexInGraph.edges);
 
-            //-----------------блок управления режимом куда идти змейке------------------
+                    for(Dijkstra.Edge e : tailVertexInGraph.edges){
+//                        System.out.println("берем ребро из tailVertexInGraph: ");
+//                        System.out.println(e);
+//                        System.out.println("вытаскиваем из этого ребра вершину: "+e.v);
+//                        System.out.println("вставляем в эту вершину доп.ребро со ссылкой на tailVertexInGraph");
+                        e.v.edges.add(new Dijkstra.Edge(tailVertexInGraph, 1));
+//                        System.out.println("эта вершина теперь содержит ребра: "+e.v.edges);
+                    }
+//                    System.out.println("в результате: tailVertexInGraph.adjs= "+tailVertexInGraph.edges);
+//                    System.out.println("перезапускаем computeGraph и buildPath:");
+//                    headVertexInTailGraph = getTargetFromGraph(graphTail, head);
+                    tailVertexInGraph = getTargetFromGraph(graphTail, tail);
+                    headVertexInTailGraph = getTargetFromGraph(graphTail, head);
+                    Dijkstra.computeGraph(headVertexInTailGraph, tail);
+//                    System.out.println("перезапускаем buildPath:");
+                    this.pathToTail = Dijkstra.buildPath(tailVertexInGraph, tail);
+                    System.out.println("обновлённый pathToTail: "+pathToTail);
+
+
+                    System.out.println("обновленный tailVertexInGraph"+tailVertexInGraph);
+
+                    System.out.println("graphTail: "+graphTail);
+                }
+            }
+
+
+//-----------------блок управления режимом куда идти змейке------------------
 //Здесь вся логика принятия решений КУДА идём. Тут много мутируем поля класса
             target = choosePathAndTarget();
 
@@ -239,12 +252,13 @@ public class YourSolver implements Solver<Board> {
 
     public Point findBestDetour(Point from) {
         System.out.println("in findBestDetour");
-        // сюда отправляем nextStep в случаях, когда пути к яблоку и камню не найдены
+        // сюда отправляем nextStep в случаях, когда никакие пути не найдены или являются опасными
         Dijkstra.Vertex headV = this.graphApple.stream().filter((v) -> v.point.equals(from)).findFirst().orElse(null);
 //        System.out.println("headV found: " + headV.point);
         Dijkstra.Vertex bestVertex = null;
         int totalVertexesFound = 0;
         for (Dijkstra.Edge e : headV.edges) {
+            bestVertex = e.v; //взяли первое попавшееся, на случай, если потом не найдем лучшего хода, иначе вернулся бы null
 //берем у головы все её три смежные вершины и, в цикле ищем, для какой вершины будет макс.число totalVertexesFound. Эту вершины и возвращаем как bestVertex
 //            System.out.println("inside of for-loop");
             System.out.println("checking sub-vertex: " + e.v.point);
@@ -421,30 +435,24 @@ public class YourSolver implements Solver<Board> {
             System.out.println("heading to: stone");
         } else if (pathToApple.isEmpty() && pathToStone.size() > 0 && pathToTail.size() > 0) {
             //если нет пути к яблоку- анализируем, идти ли нам на камень или еще погулять
-            System.out.println("path to apple is empty!");
-            Point probe = findBestDetour(head);
-            if (cycleCounterBeforeWalkingToStone < 5) {
-                cycleCounterBeforeWalkingToStone++;
-                System.out.println("heading to a probe point while counterDelayGoingToStone < 5");
-                currentPath = new LinkedList<>();
-                currentPath.add(probe);
-                target = probe;
-            } else {
-                System.out.println("heading to: stone because counterDelayGoingToStone is = " + cycleCounterBeforeWalkingToStone);
-                currentPath = pathToStone;
-                target = stone;
-            }
+            System.out.println("path to apple is empty, but found pathToStone and pathToTail!");
+            target = manageSendingToTail(target);//manageSendingToTail() включает в себя анализ и перенаправление на Stone
         } else if (pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.size() > 0) {
             //если нет пути ни к яблоку, ни к камню, но есть проход к хвосту- направляемся на свой хвост
+            // тут уже не запускаем manageSendingToTail() потому, как уже не нужно решать "слать на хвост или нет"-и так ясно, что слать на хвост!
             currentPath = pathToTail;
             target = tail;
             System.out.println("pathes to apple and stone are empty!");
             System.out.println("heading to: tail");
         } else if (pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty()) {//направляемся "куда-ни-будь"
-            System.out.println("Paths to apple, stone and tail are empty!");
-
-            currentPath = new LinkedList<>();
-            target = null;
+            System.out.println("Paths to apple, stone and tail are empty! Starting searching for seeableTailEnd");
+            Point seeableTailEnd = findseeableTailEndAndSetCurrentPathIfFound();
+            if (seeableTailEnd != null) {
+                target = seeableTailEnd;
+            } else {
+                target = findBestDetour(head);
+                currentPath.add(target);
+            }
         } else if (pathToApple.isEmpty() && pathToTail.isEmpty() && pathToStone.size() > 0) {//направляемся "куда-ни-будь"
             System.out.println("Paths to apple and tail are empty!  Heading to stone");
             currentPath = pathToStone;
@@ -457,6 +465,22 @@ public class YourSolver implements Solver<Board> {
         return target;
     }
 
+    public Point findseeableTailEndAndSetCurrentPathIfFound() {
+        Point seeableTAilEnd = null;
+        for (int i = arrangedSnake.size() - 1; i >= 5; i--) {
+            Dijkstra.Vertex newTailVertex = getTargetFromGraph(graphTail, arrangedSnake.get(i));
+            this.pathToTail = Dijkstra.buildPath(newTailVertex, null);
+            if (!pathToTail.isEmpty()) {
+                System.out.println("нашли pathToTail для элемента змеи № " + i + "из всего " + arrangedSnake.size() + "звеньев.\n" +
+                        "установили существующей путь в свойство  this.pathToTail");
+                seeableTAilEnd = arrangedSnake.get(i);
+                break;
+            } else {
+                System.out.println("надо сходить на хвост, но его не видно. Продолжаем искать последнее видимое звено хвоста.");
+            }
+        }
+        return seeableTAilEnd;
+    }
 
     //метод проверяет есть ли вокруг яблока достаточно места и решает, может пойти на хвост или на камень
     public Point decideIfWeGoToApple() {
@@ -473,42 +497,55 @@ public class YourSolver implements Solver<Board> {
         } else {
             System.out.println("path to apple found, but can't go for apple, as freeSpaceAround < requiredVertexMinimum");
 
-            if (!pathToTail.isEmpty()) {
-                //проверяем, не опасно ли пойти на хвост:
-                visited = new HashSet<>();
-                Dijkstra.Vertex tailV = getTargetFromGraph(graphApple, tail);
-                freeSpaceAroundTail = countSpaceAround(tailV, visited);
-//---- проверяем, безопасно ли пойти на хвост вместо яблока. Требуем, чтобы вокруг хвоста было ощутимо больше ходов:
-                if (freeSpaceAroundTail > freeSpaceAroundApple * 2) {
-                    currentPath = pathToTail;
-                    target = tail;
-                    System.out.println("path to apple found, freeSpaceAroundApple < requiredVertexMinimum\n heading to: tail");
-                } else if
-                (!pathToStone.isEmpty()) {
-                    //проверяем, не опасно ли пойти на хвост:
-                    visited = new HashSet<>();
-                    Dijkstra.Vertex stoneV = getTargetFromGraph(graphStone, tail);
-                    freeSpaceAroundTail = countSpaceAround(stoneV, visited);
-                    if (freeSpaceAroundTail > freeSpaceAroundApple * 2) {
-                        currentPath = pathToStone;
-                        target = stone;
-                        System.out.println("path to apple found, but little space around, path to tail found, but also little space around");
-                        System.out.println("path to stone found, space around stone is sufficient, heading to stone");
-                    }
-
-                } else { //если же альтернатив сьеданию яблока с плохоим freeSpaceAroundApple не найдена, таки идем на яблоко:
-                    currentPath = pathToApple;
-                    target = apple;
+            if (pathToTail.isEmpty()) {
+                Point newTailEnd = findseeableTailEndAndSetCurrentPathIfFound();
+                if (newTailEnd != null) {
+                    target = manageSendingToTail(newTailEnd);
+                } else if (!pathToStone.isEmpty()) {
+                    currentPath = pathToStone;
+                    target = stone;
+                    System.out.println("pathToStone found, heading to stone");
+                } else {
+                    target = findBestDetour(head);
+                    currentPath.add(target);
                 }
-            } else /*pathToTail found as empty!*/ {
-                currentPath = pathToStone;
-                target = stone;
-                System.out.println("going to stone without checking if pathToStone exists!");
+
+            } else if(!pathToTail.isEmpty()){
+                target = manageSendingToTail(target);
             }
         }
         return target;
     }
 
+    public Point manageSendingToTail(Point target){
+        //manageSendingToTail() включает в себя анализ и перенаправление на Stone
+        //проверяем, не опасно ли пойти на хвост:
+        Set<Dijkstra.Vertex> visited = new HashSet<>();
+        Dijkstra.Vertex tailV = getTargetFromGraph(graphTail, tail);
+        freeSpaceAroundTail = countSpaceAround(tailV, visited);
+//---- проверяем, безопасно ли пойти на хвост вместо яблока. Требуем, чтобы вокруг хвоста было ощутимо больше ходов:
+        if (freeSpaceAroundTail > freeSpaceAroundApple * 2) {
+            currentPath = pathToTail;
+            target = tail;
+            System.out.println("path to apple found, freeSpaceAroundApple < requiredVertexMinimum\n heading to: tail");
+        } else if (!pathToStone.isEmpty()) {
+            //проверяем, не опасно ли пойти на камень:
+            visited = new HashSet<>();
+            Dijkstra.Vertex stoneV = getTargetFromGraph(graphStone, stone);
+            freeSpaceAroundStone = countSpaceAround(stoneV, visited);
+            if (freeSpaceAroundStone > freeSpaceAroundApple * 2) {
+                currentPath = pathToStone;
+                target = stone;
+                System.out.println("path to apple found, but little space around, path to tail found, but also little space around");
+                System.out.println("path to stone found, space around stone is sufficient, heading to stone");
+            }
+
+        } else { //если же альтернатив сьеданию яблока с плохоим freeSpaceAroundApple не найдена, таки идем на яблоко:
+            currentPath = pathToApple;
+            target = apple;
+        }
+        return target;
+    }
     private class SnakeParams {
         boolean snakeSmall;
         // ограничители скручивания змейки в змеевик в зависимости от длины змейки snakeLength (snakeSize)
@@ -641,9 +678,14 @@ public class YourSolver implements Solver<Board> {
     public List<Dijkstra.Vertex> createTailGraph() {
         List<Dijkstra.Vertex> graph;
         List<Point> snake = this.board.getSnake();
-        List<Point> freeSpace = this.board.get(Elements.NONE, Elements.GOOD_APPLE, Elements.BAD_APPLE);
 
-        freeSpace.add(this.board.getHead());
+        System.out.println("in createTailGraph");
+        List<Point> lEnds = this.board.get(Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT);
+        System.out.println("lEnds: "+lEnds);
+        System.out.println("this.tail: "+this.tail);
+
+
+        List<Point> freeSpace = this.board.get(Elements.NONE, Elements.GOOD_APPLE, Elements.BAD_APPLE,  Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT);        freeSpace.add(this.board.getHead());
         freeSpace.add(this.tail);
         graph = freeSpace.stream().map(Dijkstra.Vertex::new).collect(Collectors.toList());
 
@@ -655,10 +697,8 @@ public class YourSolver implements Solver<Board> {
             Point right = new PointImpl(p.getX() + 1, p.getY());
 
 
-            if (this.board.isAt(up, Elements.NONE) || this.board.isAt(up, Elements.GOOD_APPLE)
-                    || this.board.isAt(up, Elements.BAD_APPLE)
-                    || this.board.isAt(up, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
-            )
+            if (this.board.isAt(up,
+                    Elements.NONE, Elements.GOOD_APPLE, Elements.BAD_APPLE, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT)
             ) {
                 graph.stream().filter((c) ->
                         c.point.equals(up)
@@ -666,10 +706,7 @@ public class YourSolver implements Solver<Board> {
             }
 
 
-            if (this.board.isAt(down, Elements.NONE) || this.board.isAt(down, Elements.GOOD_APPLE)
-                    || this.board.isAt(down, Elements.BAD_APPLE)
-                    || this.board.isAt(down, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
-            )
+            if (       this.board.isAt(down, Elements.NONE, Elements.GOOD_APPLE, Elements.BAD_APPLE, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT)
             ) {
                 graph.stream().filter((c) ->
                         c.point.equals(down)
@@ -677,10 +714,8 @@ public class YourSolver implements Solver<Board> {
             }
 
 
-            if (this.board.isAt(left, Elements.NONE) || this.board.isAt(left, Elements.GOOD_APPLE)
-                    || this.board.isAt(left, Elements.BAD_APPLE)
-                    || this.board.isAt(left, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
-            )
+            if (this.board.isAt(left,
+                    Elements.NONE, Elements.GOOD_APPLE, Elements.BAD_APPLE, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT)
             ) {
                 graph.stream().filter((c) ->
                         c.point.equals(left)
@@ -688,10 +723,8 @@ public class YourSolver implements Solver<Board> {
             }
 
 
-            if (this.board.isAt(right, Elements.NONE) || this.board.isAt(right, Elements.GOOD_APPLE)
-                    || this.board.isAt(right, Elements.BAD_APPLE)
-                    || this.board.isAt(right, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
-            )
+            if (this.board.isAt(right,
+                    Elements.NONE, Elements.GOOD_APPLE, Elements.BAD_APPLE, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT)
             ) {
                 graph.stream().filter((c) ->
                         c.point.equals(right)
@@ -703,6 +736,85 @@ public class YourSolver implements Solver<Board> {
         return graph;
 
     }
+
+//    public List<Dijkstra.Vertex> createTailGraph() {
+//        List<Dijkstra.Vertex> graph;
+//        List<Point> snake = this.board.getSnake();
+//        List<Point> freeSpace = this.board.get(Elements.NONE, Elements.GOOD_APPLE, Elements.BAD_APPLE);
+//
+//        freeSpace.add(this.board.getHead());
+//        freeSpace.add(this.tail);
+//        graph = freeSpace.stream().map(Dijkstra.Vertex::new).collect(Collectors.toList());
+//
+//        Consumer<Dijkstra.Vertex> setEdges = (v) -> {
+//            Point p = v.point;
+//            Point up = new PointImpl(p.getX(), p.getY() + 1);
+//            Point down = new PointImpl(p.getX(), p.getY() - 1);
+//            Point left = new PointImpl(p.getX() - 1, p.getY());
+//            Point right = new PointImpl(p.getX() + 1, p.getY());
+//
+//
+//            if (       this.board.isAt(up, Elements.NONE)
+//                    || this.board.isAt(up, Elements.GOOD_APPLE)
+//                    || this.board.isAt(up, Elements.BAD_APPLE)
+//                    || this.board.isAt(up, Elements.TAIL_END_DOWN)
+//                    || this.board.isAt(up, Elements.TAIL_END_UP)
+//                    || this.board.isAt(up, Elements.TAIL_END_LEFT)
+//                    || this.board.isAt(up, Elements.TAIL_END_RIGHT
+//            )
+//            ) {
+//                graph.stream().filter((c) ->
+//                        c.point.equals(up)
+//                ).findFirst().ifPresent((vUp) -> v.edges.add(new Dijkstra.Edge(vUp, 1)));
+//            }
+//
+//
+//            if (       this.board.isAt(down, Elements.NONE)
+//                    || this.board.isAt(down, Elements.GOOD_APPLE)
+//                    || this.board.isAt(down, Elements.BAD_APPLE)
+//                    || this.board.isAt(down, Elements.TAIL_END_DOWN)
+//                    || this.board.isAt(down, Elements.TAIL_END_UP)
+//                    || this.board.isAt(down, Elements.TAIL_END_LEFT)
+//                    || this.board.isAt(down, Elements.TAIL_END_RIGHT)
+//            ) {
+//                graph.stream().filter((c) ->
+//                        c.point.equals(down)
+//                ).findFirst().ifPresent((vDown) -> v.edges.add(new Dijkstra.Edge(vDown, 1)));
+//            }
+//
+//
+//            if (       this.board.isAt(left, Elements.NONE)
+//                    || this.board.isAt(left, Elements.GOOD_APPLE)
+//                    || this.board.isAt(left, Elements.BAD_APPLE)
+//                    || this.board.isAt(left, Elements.TAIL_END_DOWN)
+//                    || this.board.isAt(left, Elements.TAIL_END_UP)
+//                    || this.board.isAt(left, Elements.TAIL_END_LEFT)
+//                    || this.board.isAt(left, Elements.TAIL_END_RIGHT)
+//            ) {
+//                graph.stream().filter((c) ->
+//                        c.point.equals(left)
+//                ).findFirst().ifPresent((vLeft) -> v.edges.add(new Dijkstra.Edge(vLeft, 1)));
+//            }
+//
+//
+//            if (       this.board.isAt(right, Elements.NONE)
+//                    || this.board.isAt(right, Elements.GOOD_APPLE)
+//                    || this.board.isAt(right, Elements.BAD_APPLE)
+//                    || this.board.isAt(right, Elements.TAIL_END_DOWN)
+//                    || this.board.isAt(right, Elements.TAIL_END_UP)
+//                    || this.board.isAt(right, Elements.TAIL_END_LEFT)
+//                    || this.board.isAt(right, Elements.TAIL_END_RIGHT)
+//            ) {
+//                graph.stream().filter((c) ->
+//                        c.point.equals(right)
+//                ).findFirst().ifPresent(vRight -> v.edges.add(new Dijkstra.Edge(vRight, 1)));
+//            }
+//        };
+//
+//        graph.forEach((v) -> setEdges.accept(v));
+//        return graph;
+//
+//    }
 
     public LinkedList<Point> arrangeSnake(List<Point> snake) {
         // т.к. board.getSnake возвращает не связанную змейку, а хаотичный набор ее тела,
@@ -741,7 +853,7 @@ public class YourSolver implements Solver<Board> {
     }
 
     public void fillY(List<Point> snakeElements, LinkedList<Point> result) {
-        System.out.println("in fillY");
+//        System.out.println("in fillY");
         Point startElem;
         if (result.isEmpty() || snakeElements.isEmpty()) {
             return;
@@ -768,7 +880,7 @@ public class YourSolver implements Solver<Board> {
     }
 
     public void fillX(List<Point> snakeElements, LinkedList<Point> result) {
-        System.out.println("in fillX");
+//        System.out.println("in fillX");
         Point startElem;
         if (result.isEmpty() || snakeElements.isEmpty()) {
             return;

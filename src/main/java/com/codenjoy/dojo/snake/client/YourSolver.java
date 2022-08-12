@@ -151,8 +151,7 @@ public class YourSolver implements Solver<Board> {
     public Point chooseMovementMode(List<Point> currentPath, Point target) {
         Point nextStep = null;
         if (currentPath.isEmpty() || target == null) {
-            Point bestVertex = findBestDetour(this.board.getHead());
-            nextStep = target;
+            nextStep  = findBestDetour(this.board.getHead());
 
             System.out.println("best V is:" + nextStep);
             return nextStep;

@@ -101,18 +101,6 @@ public class Dijkstra {
             for (Edge e : current.edges) {
                 //TODO вставить остановку: if(current.equals(searched)) - break; ввести в computeGraph новый аргумент searched -сугубо для остановки дальнейшего расчета пути
                 Vertex target = e.v;
-                if (
-                        to != null &&
-                        Math.abs(target.point.getX() - to.getX()) <= 1
-                        && Math.abs(target.point.getY() - to.getY()) == 0
-                        ||
-                        to != null && Math.abs(target.point.getX() - to.getX()) == 0
-                                && Math.abs(target.point.getY() - to.getY()) <= 1
-
-                ) {
-                    System.out.println("in computeGraph found: a vertex close to destination " + to + " is found");
-                    System.out.println("found vertex: " + target);
-                }
                 double testedWeight = current.minWeight + e.weight;
                 if (testedWeight < target.minWeight) {
                     q.remove(target);

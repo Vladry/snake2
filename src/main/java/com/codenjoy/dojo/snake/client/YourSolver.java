@@ -42,7 +42,7 @@ public class YourSolver implements Solver<Board> {
     int freeSpaceAroundStone = 0;
     int freeSpaceAroundTail = 0;
     int maximumAllowedSnakeSize = 0;
-    LinkedList<Point> arrangedSnake = new LinkedList<>();
+//    LinkedList<Point> arrangedSnake = new LinkedList<>();
 
     public YourSolver(Dice dice) {
         this.dice = dice;
@@ -57,16 +57,15 @@ public class YourSolver implements Solver<Board> {
         this.stone = board.getStones().get(0);
         snake = new ArrayList<>();
         this.snake.addAll(board.getSnake());
-        arrangedSnake = new LinkedList<>();//обязательно пересоздать, иначе добавляет новую змею в существующую старую змею
-        arrangedSnake.addAll(arrangeSnake(snake));
-        Point tail_Awesome = this.board.get(Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT).get(0);
-        System.out.println("tail_Awesome: "+tail_Awesome);
+//        arrangedSnake = new LinkedList<>();//обязательно пересоздать, иначе добавляет новую змею в существующую старую змею
+//        arrangedSnake.addAll(arrangeSnake(snake));
+        this.tail = this.board.get(Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT).get(0);
+        System.out.println("tail: "+tail);
         System.out.println("snake.size(): "+snake.size());
-        System.out.println("arrangedSnake.size(): "+arrangedSnake.size());
-        this.tail = null;
-        if (!arrangedSnake.isEmpty()) {
-            this.tail = arrangedSnake.get(arrangedSnake.size() - 1);
-        }
+//        System.out.println("arrangedSnake.size(): "+arrangedSnake.size());
+//        if (!arrangedSnake.isEmpty()) {
+//            this.tail = arrangedSnake.get(arrangedSnake.size() - 1);
+//        }
 
         minimumReqAmntOfStepsAroundThePoint = 40;
         maximumAllowedSnakeSize = 70;
@@ -437,13 +436,13 @@ public class YourSolver implements Solver<Board> {
 
     public Point findseeableTailEndAndSetCurrentPathIfFound() {
         Point seeableTAilEnd = null;
-        for (int i = arrangedSnake.size() - 1; i >= 5; i--) {
-            Dijkstra.Vertex newTailVertex = getTargetFromGraph(graphTail, arrangedSnake.get(i));
+        for (int i = this.snake.size() - 1; i >= 5; i--) {
+            Dijkstra.Vertex newTailVertex = getTargetFromGraph(graphTail, this.snake.get(i));
             this.pathToTail = Dijkstra.buildPath(newTailVertex);
             if (!pathToTail.isEmpty()) {
-                System.out.println("нашли pathToTail для элемента змеи № " + i + "из всего " + arrangedSnake.size() + "звеньев.\n" +
+                System.out.println("нашли pathToTail для элемента змеи № " + i + "из всего " + this.snake.size() + "звеньев.\n" +
                         "установили существующей путь в свойство  this.pathToTail");
-                seeableTAilEnd = arrangedSnake.get(i);
+                seeableTAilEnd = this.snake.get(i);
                 break;
             } else {
                 System.out.println("надо сходить на хвост, но его не видно. Продолжаем искать последнее видимое звено хвоста.");

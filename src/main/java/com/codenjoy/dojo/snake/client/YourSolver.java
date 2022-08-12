@@ -51,7 +51,6 @@ public class YourSolver implements Solver<Board> {
     @Override
     public String get(Board board) {
 
-
         this.board = board;
         this.head = board.getHead();
         this.apple = board.getApples().get(0);
@@ -60,8 +59,10 @@ public class YourSolver implements Solver<Board> {
         this.snake.addAll(board.getSnake());
         arrangedSnake = new LinkedList<>();//обязательно пересоздать, иначе добавляет новую змею в существующую старую змею
         arrangedSnake.addAll(arrangeSnake(snake));
-
-
+        Point tail_Awesome = this.board.get(Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT).get(0);
+        System.out.println("tail_Awesome: "+tail_Awesome);
+        System.out.println("snake.size(): "+snake.size());
+        System.out.println("arrangedSnake.size(): "+arrangedSnake.size());
         this.tail = null;
         if (!arrangedSnake.isEmpty()) {
             this.tail = arrangedSnake.get(arrangedSnake.size() - 1);
@@ -97,9 +98,9 @@ public class YourSolver implements Solver<Board> {
             Dijkstra.Vertex stoneVertexInGraph = getTargetFromGraph(graphStone, stone);
             Dijkstra.Vertex tailVertexInGraph = getTargetFromGraph(graphTail, tail);
 
-            this.pathToApple = Dijkstra.buildPath(appleVertexInGraph, null);
-            this.pathToStone = Dijkstra.buildPath(stoneVertexInGraph, null);
-            this.pathToTail = Dijkstra.buildPath(tailVertexInGraph, tail);
+            this.pathToApple = Dijkstra.buildPath(appleVertexInGraph);
+            this.pathToStone = Dijkstra.buildPath(stoneVertexInGraph);
+            this.pathToTail = Dijkstra.buildPath(tailVertexInGraph);
             System.out.println("pathToTail:" + pathToTail);
 
             if (pathToTail.size() >= 1) {
@@ -439,7 +440,7 @@ public class YourSolver implements Solver<Board> {
         Point seeableTAilEnd = null;
         for (int i = arrangedSnake.size() - 1; i >= 5; i--) {
             Dijkstra.Vertex newTailVertex = getTargetFromGraph(graphTail, arrangedSnake.get(i));
-            this.pathToTail = Dijkstra.buildPath(newTailVertex, null);
+            this.pathToTail = Dijkstra.buildPath(newTailVertex);
             if (!pathToTail.isEmpty()) {
                 System.out.println("нашли pathToTail для элемента змеи № " + i + "из всего " + arrangedSnake.size() + "звеньев.\n" +
                         "установили существующей путь в свойство  this.pathToTail");
@@ -649,12 +650,6 @@ public class YourSolver implements Solver<Board> {
         List<Dijkstra.Vertex> graph;
         List<Point> snake = this.board.getSnake();
 
-        System.out.println("in createTailGraph");
-        List<Point> lEnds = this.board.get(Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT);
-        System.out.println("lEnds: "+lEnds);
-        System.out.println("this.tail: "+this.tail);
-
-
         List<Point> freeSpace = this.board.get(Elements.NONE, Elements.GOOD_APPLE, Elements.BAD_APPLE,  Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT);        freeSpace.add(this.board.getHead());
         freeSpace.add(this.tail);
         graph = freeSpace.stream().map(Dijkstra.Vertex::new).collect(Collectors.toList());
@@ -707,91 +702,12 @@ public class YourSolver implements Solver<Board> {
 
     }
 
-//    public List<Dijkstra.Vertex> createTailGraph() {
-//        List<Dijkstra.Vertex> graph;
-//        List<Point> snake = this.board.getSnake();
-//        List<Point> freeSpace = this.board.get(Elements.NONE, Elements.GOOD_APPLE, Elements.BAD_APPLE);
-//
-//        freeSpace.add(this.board.getHead());
-//        freeSpace.add(this.tail);
-//        graph = freeSpace.stream().map(Dijkstra.Vertex::new).collect(Collectors.toList());
-//
-//        Consumer<Dijkstra.Vertex> setEdges = (v) -> {
-//            Point p = v.point;
-//            Point up = new PointImpl(p.getX(), p.getY() + 1);
-//            Point down = new PointImpl(p.getX(), p.getY() - 1);
-//            Point left = new PointImpl(p.getX() - 1, p.getY());
-//            Point right = new PointImpl(p.getX() + 1, p.getY());
-//
-//
-//            if (       this.board.isAt(up, Elements.NONE)
-//                    || this.board.isAt(up, Elements.GOOD_APPLE)
-//                    || this.board.isAt(up, Elements.BAD_APPLE)
-//                    || this.board.isAt(up, Elements.TAIL_END_DOWN)
-//                    || this.board.isAt(up, Elements.TAIL_END_UP)
-//                    || this.board.isAt(up, Elements.TAIL_END_LEFT)
-//                    || this.board.isAt(up, Elements.TAIL_END_RIGHT
-//            )
-//            ) {
-//                graph.stream().filter((c) ->
-//                        c.point.equals(up)
-//                ).findFirst().ifPresent((vUp) -> v.edges.add(new Dijkstra.Edge(vUp, 1)));
-//            }
-//
-//
-//            if (       this.board.isAt(down, Elements.NONE)
-//                    || this.board.isAt(down, Elements.GOOD_APPLE)
-//                    || this.board.isAt(down, Elements.BAD_APPLE)
-//                    || this.board.isAt(down, Elements.TAIL_END_DOWN)
-//                    || this.board.isAt(down, Elements.TAIL_END_UP)
-//                    || this.board.isAt(down, Elements.TAIL_END_LEFT)
-//                    || this.board.isAt(down, Elements.TAIL_END_RIGHT)
-//            ) {
-//                graph.stream().filter((c) ->
-//                        c.point.equals(down)
-//                ).findFirst().ifPresent((vDown) -> v.edges.add(new Dijkstra.Edge(vDown, 1)));
-//            }
-//
-//
-//            if (       this.board.isAt(left, Elements.NONE)
-//                    || this.board.isAt(left, Elements.GOOD_APPLE)
-//                    || this.board.isAt(left, Elements.BAD_APPLE)
-//                    || this.board.isAt(left, Elements.TAIL_END_DOWN)
-//                    || this.board.isAt(left, Elements.TAIL_END_UP)
-//                    || this.board.isAt(left, Elements.TAIL_END_LEFT)
-//                    || this.board.isAt(left, Elements.TAIL_END_RIGHT)
-//            ) {
-//                graph.stream().filter((c) ->
-//                        c.point.equals(left)
-//                ).findFirst().ifPresent((vLeft) -> v.edges.add(new Dijkstra.Edge(vLeft, 1)));
-//            }
-//
-//
-//            if (       this.board.isAt(right, Elements.NONE)
-//                    || this.board.isAt(right, Elements.GOOD_APPLE)
-//                    || this.board.isAt(right, Elements.BAD_APPLE)
-//                    || this.board.isAt(right, Elements.TAIL_END_DOWN)
-//                    || this.board.isAt(right, Elements.TAIL_END_UP)
-//                    || this.board.isAt(right, Elements.TAIL_END_LEFT)
-//                    || this.board.isAt(right, Elements.TAIL_END_RIGHT)
-//            ) {
-//                graph.stream().filter((c) ->
-//                        c.point.equals(right)
-//                ).findFirst().ifPresent(vRight -> v.edges.add(new Dijkstra.Edge(vRight, 1)));
-//            }
-//        };
-//
-//        graph.forEach((v) -> setEdges.accept(v));
-//        return graph;
-//
-//    }
-
     public LinkedList<Point> arrangeSnake(List<Point> snake) {
         // т.к. board.getSnake возвращает не связанную змейку, а хаотичный набор ее тела,
         // нам нужно этот набор превратить в связную змею, которую и возвращает этот метод  arrangeSnake и fillY и fillX
-        System.out.println("in arrangeSnake");
+//        System.out.println("in arrangeSnake");
         if (snake == null || snake.isEmpty()) {
-            System.out.println("snake is empty or null! Exiting arrangeSnake");
+//            System.out.println("snake is empty or null! Exiting arrangeSnake");
             return new LinkedList<>();
         }
         List<Point> snakeElements = new ArrayList<Point>();

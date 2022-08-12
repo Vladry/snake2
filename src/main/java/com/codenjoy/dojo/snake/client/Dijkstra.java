@@ -124,7 +124,7 @@ public class Dijkstra {
         }
     }
 
-    public static LinkedList<Point> buildPath(Vertex destination, Point tail) {
+    public static LinkedList<Point> buildPath(Vertex destination) {
         LinkedList<Point> path = new LinkedList<>();
         Vertex current = destination;
         for (; current != null; current = current.prev) {

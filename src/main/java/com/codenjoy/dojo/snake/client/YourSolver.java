@@ -90,7 +90,6 @@ public class YourSolver implements Solver<Board> {
             Dijkstra.computeGraph(headVertexInStoneGraph, null);
 
 
-
             Dijkstra.Vertex headVertexInTailGraph = getTargetFromGraph(graphTail, head);
             Dijkstra.computeGraph(headVertexInTailGraph, tail);
 
@@ -105,35 +104,6 @@ public class YourSolver implements Solver<Board> {
 
             if (pathToTail.size() >= 1) {
                 pathToTail.removeLast(); // сам конец хвоста удаляем, чтобы самого-себя не укусить!
-            } else {//TODO позднее сюда вставить поиск последней открытой для доступа части тела змеи
-//а сейчас здесь нужно поправить "глючный" graphTail. Для этого находим tail и насильно пере-линковываем ему все соседние точки.
-                System.out.println("т.к. pathToTail НЕ найден, зашли в ветку доработки graphTail!!!!");
-                if(tailVertexInGraph.prev==null){
-//                    System.out.println("было: tailVertexInGraph.adjs= "+tailVertexInGraph.edges);
-
-                    for(Dijkstra.Edge e : tailVertexInGraph.edges){
-//                        System.out.println("берем ребро из tailVertexInGraph: ");
-//                        System.out.println(e);
-//                        System.out.println("вытаскиваем из этого ребра вершину: "+e.v);
-//                        System.out.println("вставляем в эту вершину доп.ребро со ссылкой на tailVertexInGraph");
-                        e.v.edges.add(new Dijkstra.Edge(tailVertexInGraph, 1));
-//                        System.out.println("эта вершина теперь содержит ребра: "+e.v.edges);
-                    }
-//                    System.out.println("в результате: tailVertexInGraph.adjs= "+tailVertexInGraph.edges);
-//                    System.out.println("перезапускаем computeGraph и buildPath:");
-//                    headVertexInTailGraph = getTargetFromGraph(graphTail, head);
-                    tailVertexInGraph = getTargetFromGraph(graphTail, tail);
-                    headVertexInTailGraph = getTargetFromGraph(graphTail, head);
-                    Dijkstra.computeGraph(headVertexInTailGraph, tail);
-//                    System.out.println("перезапускаем buildPath:");
-                    this.pathToTail = Dijkstra.buildPath(tailVertexInGraph, tail);
-                    System.out.println("обновлённый pathToTail: "+pathToTail);
-
-
-                    System.out.println("обновленный tailVertexInGraph"+tailVertexInGraph);
-
-                    System.out.println("graphTail: "+graphTail);
-                }
             }
 
 

@@ -44,6 +44,7 @@ public class YourSolver implements Solver<Board> {
     int freeSpaceAroundStone = 0;
     int freeSpaceAroundTail = 0;
     int maximumAllowedSnakeSize = 0;
+
     public YourSolver(Dice dice) {
         this.dice = dice;
     }
@@ -59,12 +60,13 @@ public class YourSolver implements Solver<Board> {
         snake = new ArrayList<>();
         this.snake.addAll(board.getSnake());
         LinkedList<Point> arrangedSnake = arrangeSnake(snake);
+        System.out.println("snake.size(): " + snake.size());
         System.out.println("arranged snake: " + arrangedSnake);
-        this.tail = apple; //
+        this.tail = apple; //временно, до переназначения назначим хвосту яблочко, шоб не було нулём
         if (!arrangedSnake.isEmpty()) {
-            tail = arrangedSnake.get(arrangedSnake.size() - 1);
+            this.tail = arrangedSnake.get(arrangedSnake.size() - 1);
         }
-        System.out.println("tail at: " + tail);
+//        System.out.println("tail at: " + tail);
         minimumReqAmntOfStepsAroundThePoint = 40;
         maximumAllowedSnakeSize = 70;
 
@@ -98,13 +100,29 @@ public class YourSolver implements Solver<Board> {
             this.pathToStone = Dijkstra.buildPath(stoneVertexInGraph);
             this.pathToTail = Dijkstra.buildPath(tailVertexInGraph);
 
+            if (pathToTail.isEmpty()) {
+                System.out.println("pathToTail not found for tail: "+tail);
+                for (int i = arrangedSnake.size() - 1; i >= 2; i--) {
+                    tailVertexInGraph = getTargetFromGraph(graphTail, arrangedSnake.get(i));
+                    this.pathToTail = Dijkstra.buildPath(tailVertexInGraph);
+                    if (!pathToTail.isEmpty()) {
+                        System.out.println("pathToTail found for arrangedStake.get("+i+")");
+                        break;
+                    } else {
+                        System.out.println("for arrangedStake.get("+i+")  pathToTail not found");
+                    }
+                }
+            }
+
+            System.out.println("pathToTail:"+ pathToTail);
+
             if (pathToTail.size() >= 1) {
                 pathToTail.removeLast(); // сам конец хвоста удаляем, чтобы самого-себя не укусить!
             }
-            System.out.println("pathToApple: " + pathToApple);
-            System.out.println("pathToStone: " + pathToStone);
-            System.out.println("pathToTail: " + pathToTail);
-
+//            System.out.println("pathToApple: " + pathToApple);
+//            System.out.println("pathToStone: " + pathToStone);
+//            System.out.println("pathToTail: " + pathToTail);
+//            System.out.println("graphTail: " + graphTail);
 
             //-----------------блок управления режимом куда идти змейке------------------
 //Здесь вся логика принятия решений КУДА идём. Тут много мутируем поля класса
@@ -128,19 +146,31 @@ public class YourSolver implements Solver<Board> {
 
     // Основной метод выбора направления движения, включает внутри себя decideIfWeGoToApple()
 
-    public Point getSticky(Point bestVertex){
+    //TODO не дописан, не используется
+    public Point findStickyPointFromBestChoice(Point bestChoice) {
 
-        return bestVertex;
+        Dijkstra.Vertex bestChoiceVertex = getTargetFromGraph(graphApple, bestChoice);
+        List<Point> snakeElements = new ArrayList<>();
+        snakeElements.addAll(snake);
+        snakeElements.remove(head);
+        Point candidate = snakeElements.stream().filter((el) -> Math.abs(bestChoice.getX() - el.getX()) == 1
+                        || Math.abs(bestChoice.getY() - el.getY()) == 1)
+                .findFirst().orElse(null);
+        if (candidate != null) {
+            return candidate;
+        } else {
+            return bestChoice;
+        }
+
     }
 
     public Point chooseMovementMode(List<Point> currentPath, Point target) {
         Point nextStep = null;
         if (currentPath.isEmpty() || target == null) {
             Point bestVertex = findBestDetour(this.board.getHead());
+            nextStep = target;
 
-            nextStep = getSticky(bestVertex);
-
-                    System.out.println("best V is:" + nextStep);
+            System.out.println("best V is:" + nextStep);
             return nextStep;
         }
         //----------------блок выбора режима прохода, в зависимости от длины змеи:
@@ -150,7 +180,9 @@ public class YourSolver implements Solver<Board> {
         // режим прямого поиска яблока по Дейкстре (пока змейка маленькая):
         if (modeParams.snakeSmall) {
             System.out.println("змея короче чем smallEndPoint");
-            nextStep = getDirection(this.board, this.currentPath);
+            if (!currentPath.isEmpty()) {
+                nextStep = currentPath.get(0);
+            }
 
         } else {// режим скручивания в змеевик (когда змейка подросла):
             System.out.println("змея длиннее чем smallEndPoint");
@@ -250,8 +282,12 @@ public class YourSolver implements Solver<Board> {
         // если унюхали поблизости яблоко -хватаем его!
 //proximity- длина "нюха" по оси Y: прямой ход по Дейкстре разрешен без скрутки в змеевик, пока Y более proximity
         if (Math.abs(head.getY() - target.getY()) < proximity
+                || board.isNear(head, Elements.BAD_APPLE) //ни дай Бог рядом камень - может произойти сбой, поэтому не дуркуем и идем по маршруту!
         ) {
             nextStep = path.get(0);
+            System.out.println("строка 268 внутри getZdirection. Сравниваем равен ли target = path.get(0) :");
+            System.out.println("target: " + target);
+            System.out.println("path.get(0): " + path.get(0));
         } else //иначе проверяем
             // складываем змейку в змеевик
             if (board.isAt(head.getX() - 1, head.getY(), Elements.NONE, Elements.GOOD_APPLE)
@@ -306,6 +342,15 @@ public class YourSolver implements Solver<Board> {
             } else {
                 nextStep = path.get(0);
             }
+
+        //TODO проверить, а есть ли выход!
+        //проверяем, не опасно ли пойти на хвост:
+        Set<Dijkstra.Vertex> visited = new HashSet<>();
+        Dijkstra.Vertex stoneV = getTargetFromGraph(graphStone, nextStep);
+        freeSpaceAroundTail = countSpaceAround(stoneV, visited);
+        if (freeSpaceAroundTail < minimumReqAmntOfStepsAroundThePoint) {
+            nextStep = path.get(0);
+        }
         return nextStep;
     }
 
@@ -400,6 +445,10 @@ public class YourSolver implements Solver<Board> {
 
             currentPath = new LinkedList<>();
             target = null;
+        } else if (pathToApple.isEmpty() && pathToTail.isEmpty() && pathToStone.size() > 0) {//направляемся "куда-ни-будь"
+            System.out.println("Paths to apple and tail are empty!  Heading to stone");
+            currentPath = pathToStone;
+            target = stone;
         } else if (pathToApple.size() > 0) { //и, в самом ХОРОШЕМ случае, думаем  идти ли нам на на яблоко
             target = decideIfWeGoToApple();//метод проверяет есть ли вокруг яблока достаточно места и решает, может пойти на хвост или на камень
         }
@@ -451,6 +500,10 @@ public class YourSolver implements Solver<Board> {
                     currentPath = pathToApple;
                     target = apple;
                 }
+            } else /*pathToTail found as empty!*/ {
+                currentPath = pathToStone;
+                target = stone;
+                System.out.println("going to stone without checking if pathToStone exists!");
             }
         }
         return target;
@@ -470,16 +523,6 @@ public class YourSolver implements Solver<Board> {
             this.rightEndpoint = rightEndpoint;
         }
     }
-
-    public Point getDirection(Board board, LinkedList<Point> path) {
-        Point head = board.getHead();
-        Point nextStep = null;
-        if (!path.isEmpty()) {
-            nextStep = path.get(0);
-        }
-        return nextStep;
-    }
-
 
     public Dijkstra.Vertex getTargetFromGraph(List<Dijkstra.Vertex> graphTemp, Point target) {
         return graphTemp.stream().filter(
@@ -598,11 +641,10 @@ public class YourSolver implements Solver<Board> {
     public List<Dijkstra.Vertex> createTailGraph() {
         List<Dijkstra.Vertex> graph;
         List<Point> snake = this.board.getSnake();
-        Point tail = snake.get(snake.size() - 1);
         List<Point> freeSpace = this.board.get(Elements.NONE, Elements.GOOD_APPLE, Elements.BAD_APPLE);
 
         freeSpace.add(this.board.getHead());
-        freeSpace.add(tail);
+        freeSpace.add(this.tail);
         graph = freeSpace.stream().map(Dijkstra.Vertex::new).collect(Collectors.toList());
 
         Consumer<Dijkstra.Vertex> setEdges = (v) -> {
@@ -615,13 +657,8 @@ public class YourSolver implements Solver<Board> {
 
             if (this.board.isAt(up, Elements.NONE) || this.board.isAt(up, Elements.GOOD_APPLE)
                     || this.board.isAt(up, Elements.BAD_APPLE)
-
                     || this.board.isAt(up, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
-//                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL,
-//                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP
             )
-
-
             ) {
                 graph.stream().filter((c) ->
                         c.point.equals(up)
@@ -631,46 +668,30 @@ public class YourSolver implements Solver<Board> {
 
             if (this.board.isAt(down, Elements.NONE) || this.board.isAt(down, Elements.GOOD_APPLE)
                     || this.board.isAt(down, Elements.BAD_APPLE)
-
                     || this.board.isAt(down, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
-//                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL,
-//                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP
             )
-
             ) {
                 graph.stream().filter((c) ->
                         c.point.equals(down)
                 ).findFirst().ifPresent((vDown) -> v.edges.add(new Dijkstra.Edge(vDown, 1)));
-
             }
 
 
             if (this.board.isAt(left, Elements.NONE) || this.board.isAt(left, Elements.GOOD_APPLE)
                     || this.board.isAt(left, Elements.BAD_APPLE)
-
                     || this.board.isAt(left, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
-//                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL,
-//                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP
             )
-
-
             ) {
                 graph.stream().filter((c) ->
                         c.point.equals(left)
                 ).findFirst().ifPresent((vLeft) -> v.edges.add(new Dijkstra.Edge(vLeft, 1)));
-
             }
 
 
             if (this.board.isAt(right, Elements.NONE) || this.board.isAt(right, Elements.GOOD_APPLE)
                     || this.board.isAt(right, Elements.BAD_APPLE)
-
                     || this.board.isAt(right, Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT
-//                    Elements.TAIL_HORIZONTAL, Elements.TAIL_LEFT_UP, Elements.TAIL_VERTICAL,
-//                    Elements.TAIL_LEFT_DOWN, Elements.TAIL_RIGHT_DOWN, Elements.TAIL_RIGHT_UP
             )
-
-
             ) {
                 graph.stream().filter((c) ->
                         c.point.equals(right)

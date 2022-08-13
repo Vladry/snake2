@@ -391,8 +391,8 @@ public class YourSolver implements Solver<Board> {
     public Point choosePathAndTarget() {
         Point target = null;
 
-/*        if (snake.size() > maximumAllowedSnakeSize // если змея опасно-громадная
-                && pathToStone.size() > 0 && pathToApple.size() > 0 // и существуют пути,
+        if (snake.size() > maximumAllowedSnakeSize // если змея опасно-громадная
+                && !pathToStone.isEmpty() && !pathToApple.isEmpty() // и существуют пути,
                 && pathToApple.size() * 2 > pathToStone.size() //и если яблоко не прямо рядом, то идем на камень
         ) {//направляемся на камень
             currentPath = pathToStone;
@@ -400,7 +400,6 @@ public class YourSolver implements Solver<Board> {
             System.out.println("snake is to large");
             System.out.println("heading to: stone");
         } else
-            */
             if (pathToApple.isEmpty() && pathToTail.size() > 0) {
             System.out.println("path to apple is empty, but found pathToStone and pathToTail!");
             target = manageSendingToTail(target);

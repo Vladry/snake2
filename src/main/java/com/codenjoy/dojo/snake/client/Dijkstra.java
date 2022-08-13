@@ -91,7 +91,6 @@ public class Dijkstra {
 
     public static void computeGraph(Vertex source, Point to) {
         if (to != null) {
-            System.out.println("in computeGraph(to= " + to + ')');
         }
         PriorityQueue<Vertex> q = new PriorityQueue<>();
         source.minWeight = 0;
@@ -99,7 +98,6 @@ public class Dijkstra {
         while (!q.isEmpty()) {
             Vertex current = q.poll();
             for (Edge e : current.edges) {
-                //TODO вставить остановку: if(current.equals(searched)) - break; ввести в computeGraph новый аргумент searched -сугубо для остановки дальнейшего расчета пути
                 Vertex target = e.v;
                 double testedWeight = current.minWeight + e.weight;
                 if (testedWeight < target.minWeight) {

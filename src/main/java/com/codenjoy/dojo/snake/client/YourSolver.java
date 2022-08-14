@@ -98,7 +98,59 @@ public class YourSolver implements Solver<Board> {
     // -------------------методы--------------------------
 
 
-    public Point selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple(Point nextStep) {
+    public Point selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple(Point recommendedStep) {
+        System.out.println("in selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple(" + recommendedStep + ")");
+
+        Point NextStepStage1 = recommendedStep;
+        if ( // Эту проверку выполняем ТОЛЬКО когда голова находится по-диагонали рядом с яблоком, иначе возвращаем неизменённый nextStep
+                Math.abs(head.getX() - apple.getX()) == 1 && Math.abs(head.getY() - apple.getY()) == 1
+        ) {
+            Point stepOption1 = new PointImpl(head.getX(), apple.getY());
+            Point stepOption2 = new PointImpl(apple.getX(), head.getY());
+
+
+            if (loggingLevel2) {
+                System.out.println("два потенциальных шага на выбор: " + stepOption1 + " и " + stepOption2);
+//                System.out.println("!!! distance between head and apple: " + nextStep.distance(apple));
+            }
+            List<Dijkstra.Vertex> emulatedTailGraphOption1Stage1 =
+                    getEmulatedTaleGraphStage1(stepOption1);
+            List<Dijkstra.Vertex> emulatedTailGraphOption2Stage1 =
+                    getEmulatedTaleGraphStage1(stepOption2);
+
+            Dijkstra.Vertex appleVertInEmulatedTailGraphOption1Step1 = getTargetFromGraph(emulatedTailGraphOption1Stage1, head);
+            Dijkstra.Vertex appleVertInEmulatedTailGraphOption2Step1 = getTargetFromGraph(emulatedTailGraphOption2Stage1, head);
+            Set<Dijkstra.Vertex> visted = new HashSet<Dijkstra.Vertex>();
+            int firstOptionStage1 = countSpaceAround(appleVertInEmulatedTailGraphOption1Step1, visted);
+            visted = new HashSet<Dijkstra.Vertex>();
+            int secondOptionStage1 = countSpaceAround(appleVertInEmulatedTailGraphOption2Step1, visted);
+            if (loggingLevel2) {
+                System.out.println("freeSpaceAroundAple_stepOption1: " + firstOptionStage1);
+                System.out.println("freeSpaceAroundAple_stepOption2: " + secondOptionStage1);
+            }
+
+            if (firstOptionStage1 > secondOptionStage1) {
+                NextStepStage1 = stepOption1;
+                if (loggingLevel2) {
+                    System.out.println("из двух опций, выбрали лучший " + NextStepStage1);
+                }
+            } else if ((firstOptionStage1 < secondOptionStage1)) {
+                NextStepStage1 = stepOption2;
+                if (loggingLevel2) {
+                    System.out.println("из двух опций, выбрали лучший " + NextStepStage1);
+                }
+            } else if (firstOptionStage1 == secondOptionStage1) {
+                if (recommendedStep.equals(stepOption1)) {
+                    NextStepStage1 = recommendedStep;//получили наилучший следующий шаг с точки зрения пространства вокруг яблока
+                }
+            }
+        }
+        System.out.println("NextStepStage1: " + NextStepStage1);
+        return NextStepStage1;
+    }
+
+
+    /*public Point selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple(Point nextStep) {
         System.out.println("in selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple(" + nextStep + ")");
 
         boolean option1Stage1 = false, option2Stage1 = false;
@@ -114,7 +166,7 @@ public class YourSolver implements Solver<Board> {
 
             if (loggingLevel2) {
                 System.out.println("два потенциальных шага на выбор: " + stepOption1 + " и " + stepOption2);
-                System.out.println("!!! distance between head and apple: " + nextStep.distance(apple));
+//                System.out.println("!!! distance between head and apple: " + nextStep.distance(apple));
             }
             List<Dijkstra.Vertex> emulatedTailGraphOption1Stage1 =
                     getEmulatedTaleGraphStage1(stepOption1);
@@ -131,18 +183,17 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("freeSpaceAroundAple_stepOption2: " + secondOptionStage1);
             }
 
-
             if (firstOptionStage1 > secondOptionStage1) {
                 option1Stage1 = true;
                 NextStepStage1 = stepOption1;
                 if (loggingLevel2) {
-                    System.out.println("из двух опций, выбрали лучший " + nextStep);
+                    System.out.println("из двух опций, выбрали лучший " + NextStepStage1);
                 }
-            } else if ((secondOptionStage1 > firstOptionStage1)) {
+            } else if ((firstOptionStage1 < secondOptionStage1)) {
                 option2Stage1 = true;
                 NextStepStage1 = stepOption2;
                 if (loggingLevel2) {
-                    System.out.println("из двух опций, выбрали лучший " + nextStep);
+                    System.out.println("из двух опций, выбрали лучший " + NextStepStage1);
                 }
             } else if (firstOptionStage1 == secondOptionStage1) {
                 if (nextStep.equals(stepOption1)) {
@@ -181,7 +232,7 @@ public class YourSolver implements Solver<Board> {
         }
         return finalNextStep;//TODO сюда не попадает расчет из Stage2
     }
-
+*/
     public List<Dijkstra.Vertex> getEmulatedTaleGraphStage1(Point nextStepHeadPosition) {
 //        System.out.println("disconnecting from nextStepHeadPosition: "+nextStepHeadPosition);
         List<Dijkstra.Vertex> emulatedTale_BasedGraph = new ArrayList<>();
@@ -343,8 +394,8 @@ public class YourSolver implements Solver<Board> {
         System.out.println("in getZdirection -> currentPath: "+ currentPath);
         Point nextStepFromCurrentPath = this.currentPath.get(0);
         Point target = this.currentPath.get(currentPath.size()-1);
-        System.out.println("in getZdirection -> nextStepFromCurrentPath: "+ nextStepFromCurrentPath);
-        System.out.println("in getZdirection -> target: "+ target);
+//        System.out.println("in getZdirection -> nextStepFromCurrentPath: "+ nextStepFromCurrentPath);
+//        System.out.println("in getZdirection -> target: "+ target);
 /*        if (chosenPath == TO_TAIL) {// естественно, если в данный момент мы идем "на хвост", то отменяем все наши скручивания в змеевик
             if (loggingLevel1) {
                 System.out.println("in getZDirection-> в данный момент мы идем на хвост, поэтому скручивание в змеевик отменили. Возвращаем nextStep: " + target);
@@ -359,15 +410,15 @@ public class YourSolver implements Solver<Board> {
 
         // если унюхали поблизости яблоко -хватаем его!
 //proximity- длина "нюха" по оси Y: прямой ход по Дейкстре разрешен без скрутки в змеевик, пока Y более proximity
-        if (Math.abs(head.getY() - target.getY()) < proximity
+        if (Math.abs(head.getY() - target.getY()) > proximity
                 || board.isNear(head, Elements.BAD_APPLE) //ни дай Бог рядом камень - может произойти сбой, поэтому не дуркуем и идем по маршруту!
+                || Math.abs(head.getY() - target.getY()) == 0 //сожрать яблоко, когда голова на строке с яблоком при ЛЮБОМ proximity
         ) {
             nextStep = nextStepFromCurrentPath;
             if (loggingLevel1) {
-                System.out.println("set proximity for this snake length is: "+proximity);
-                System.out.println("actual deltaY between head and apple: "+Math.abs(head.getY()-apple.getY()));
-                System.out.println("actual deltaY between head and targed inside getZdirection: "+Math.abs(head.getY()-target.getY()));
-                System.out.println("малый proximity, либо рядом камень -> getZDirection generated suggestedNextStep: " + nextStep);
+                System.out.println("proximity: "+proximity);
+                System.out.println("deltaY head vs apple: "+Math.abs(head.getY()-apple.getY()));
+                System.out.println("малый proximity, либо рядом камень -> suggestedNextStep: " + nextStep);
             }
         } else //иначе проверяем
             // складываем змейку в змеевик
@@ -396,7 +447,7 @@ public class YourSolver implements Solver<Board> {
             ) {
                 nextStep = new PointImpl(head.getX() - 1, head.getY());
                 if (loggingLevel1) {
-                    System.out.println("in getZDirection-> складываем змейку в змеевик- один шаг влево: " + nextStep);
+                    System.out.println("складываем змеевик- один шаг влево: " + nextStep);
                 }
             } else if (board.isAt(head.getX() + 1, head.getY(), Elements.NONE, Elements.GOOD_APPLE)
                     && head.getX() < rightEndpoint
@@ -424,12 +475,12 @@ public class YourSolver implements Solver<Board> {
             ) {
                 nextStep = new PointImpl(head.getX() + 1, head.getY());
                 if (loggingLevel1) {
-                    System.out.println("in getZDirection-> складываем змейку в змеевик- один шаг вправо: " + nextStep);
+                    System.out.println("складываем змеевик- один шаг вправо: " + nextStep);
                 }
             } else {
                 nextStep = nextStepFromCurrentPath;
                 if (loggingLevel1) {
-                    System.out.println("in getZDirection-> почему-то не смогли сложить змейку в змеевик- устанавливаем nextStep: " + nextStep);
+                    System.out.println("-> почему-то не смогли сложить в змеевик- устанавливаем nextStep: " + nextStep);
                 }
             }
 
@@ -584,7 +635,7 @@ public class YourSolver implements Solver<Board> {
 
 
 //если змея НЕ опасно-громадная:
-            if (pathToApple.isEmpty() && !pathToTail.isEmpty() && head.distance(tail) > 1) {
+            if (pathToApple.isEmpty() && !pathToTail.isEmpty() && head.distance(tail) > 3) {
                 if (loggingLevel1) {
                     System.out.println("path to apple is empty, but found pathToTail!  Heading to tail");
                 }
@@ -659,7 +710,7 @@ public class YourSolver implements Solver<Board> {
                 if (loggingLevel1) {
                     System.out.println("path to apple found, but can't go for apple, as freeSpaceAround < requiredVertexMinimum или расстояние от головы до хваста меньше двух");
                 }
-                if (head.distance(tail) <= 1) {//обязательно чтобы голова и хвост не были совсем рядом-иначе были случаи что умирала
+                if (head.distance(tail) <= 3) {//обязательно чтобы голова и хвост не были совсем рядом-иначе были случаи что умирала
                     if (loggingLevel1) {
                         System.out.println("расстояние от головы до хваста меньше двух. Не выполнилось: if (head.distance(tail)<=1)");
                     }

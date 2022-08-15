@@ -7,7 +7,6 @@ import com.codenjoy.dojo.snake.model.Elements;
 
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static com.codenjoy.dojo.snake.client.Path.*;
@@ -54,9 +53,13 @@ public class YourSolver implements Solver<Board> {
     boolean loggingLevel2 = true;
     boolean loggingLevel3 = true;
 
+    boolean tailToHeadDistanceIsVeryMinimum = false;
     boolean tailToHeadDistanceIsOkay = false;
     boolean appleTailStonePathsNotFound = false;
-    int headToTailAllowedDistance = 1;
+    int headToTailMinimumAllowedDistance = 1;
+    int headToTailGoodDistance = 4;
+
+    int headToAppleProximity = 2;
 
 
     public YourSolver(Dice dice) {
@@ -134,7 +137,7 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("змея короче чем smallEndPoint, поэтому nextStep остаётся = currentPath.get(0)");
             }
         } else {// режим скручивания в змеевик (когда змейка подросла):
-            if (loggingLevel1) {
+            if (false) {
                 System.out.println("змея длиннее чем smallEndPoint, поэтому отсылаем nextStep на обработку в z_Folder");
                 System.out.println("calling next step = z_Folder(nextStep:" + nextStep + ")");
             }
@@ -153,7 +156,7 @@ public class YourSolver implements Solver<Board> {
 
 
     public Point z_Folder(Point nextStepFromCurrentPath, Point target, int proximity, int leftEndpoint, int rightEndpoint) {
-        System.out.println("in z_Folder(nextStepFromCurrentPath:" + nextStepFromCurrentPath + ", target: " + target + ", proximity: " + proximity + ") -> currentPath: " + currentPath);
+        System.out.println("in z_Folder(nextStepFromCurrentPath:" + nextStepFromCurrentPath + ", target: " + target);
         Point head = board.getHead();
         Point nextStep = null;
         String dir = null;
@@ -191,15 +194,23 @@ public class YourSolver implements Solver<Board> {
 
         // если унюхали поблизости яблоко -хватаем его!
 //proximity- длина "нюха" по оси Y: прямой ход по Дейкстре разрешен без скрутки в змеевик, пока Y более proximity
-        if (Math.abs(head.getY() - target.getY()) > proximity
-                || board.isNear(head, Elements.BAD_APPLE) //ни дай Бог рядом камень - может произойти сбой, поэтому не дуркуем и идем по маршруту!
-                || Math.abs(head.getY() - target.getY()) <= 2 //сожрать яблоко, когда голова уже на соседней строке с яблоком при ЛЮБОМ proximity
+        int deltaY = Math.abs(head.getY() - target.getY());
+        boolean badAppleIsNear = board.isNear(head, Elements.BAD_APPLE);
+        //headToAppleProximity - расстояние "нюха" до яблока (до длины 60 оно =2, для более 60ти оно =1
+        boolean headIsVeryCloseToApple = deltaY <= headToAppleProximity;
+
+        if (
+                deltaY > proximity  //proximity -это расстояние от яблока к голове, на котором уже скручиваемся в змеевик
+                        || badAppleIsNear //ни дай Бог рядом камень - может произойти сбой, поэтому не дуркуем и идем по маршруту!
+                        || headIsVeryCloseToApple //сожрать яблоко, когда голова уже на соседней строке с яблоком при ЛЮБОМ proximity
         ) {
             nextStep = nextStepFromCurrentPath;
             if (loggingLevel1) {
                 System.out.println("proximity: " + proximity);
-                System.out.println("deltaY head vs apple: " + Math.abs(head.getY() - apple.getY()));
-                System.out.println("малый proximity, либо рядом камень -> suggestedNextStep: " + nextStep);
+                System.out.println("deltaY: " + deltaY);
+                System.out.println("badAppleIsNear: " + badAppleIsNear);
+                System.out.println("headIsVeryCloseToApple: " + headIsVeryCloseToApple);
+                System.out.println("не совпал proximity -> suggestedNextStep: " + nextStep);
             }
         } else //иначе проверяем
             // складываем змейку в змеевик
@@ -299,6 +310,7 @@ public class YourSolver implements Solver<Board> {
                 foundInPrevCycle = vertCount;
                 bestVertex = currentCycleVertex;
             }
+            System.out.println("current vertex has freeSpace: " + vertCount);
         }
         if (loggingLevel1) {
             System.out.println("exiting findBestDetour.  Возвращаем bestVertex= " + bestVertex.point);
@@ -451,7 +463,7 @@ public class YourSolver implements Solver<Board> {
         Голова подойдет к яблоку на расстояние proximity, потом начнет скручиваться в змеевик.
         Можно это перевернуть, изменив знак на "head<target как здесь: if (Math.abs(head.getY() - target.getY()) < proximity
         Тогда proximity будет означать что голова сначала скрутится, а потом бросится к яблоку с расстояния proximity.*/
-        int proximity = 0;
+        int proximity = 0;//proximity -это расстояние от яблока к голове, на котором уже скручиваемся в змеевик
         int leftEndpoint = 1;//левая граница скручивания
         int rightEndpoint = this.board.size() - 1; //правая граница скручивания
 
@@ -461,7 +473,7 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("snakeMedium, ");
             }
             snakeSmall = false;
-            proximity = 2;
+            proximity = 4;
             leftEndpoint = 6;
             rightEndpoint = this.board.size() - 7;
         }
@@ -472,7 +484,7 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("snakeMedium, ");
             }
             snakeSmall = false;
-            proximity = 4;
+            proximity = 7;
             leftEndpoint = 5;
             rightEndpoint = this.board.size() - 6;
         }
@@ -481,11 +493,11 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("snakeLarge, ");
             }
             snakeSmall = false;
-            proximity = 8;
+            proximity = 10;
             leftEndpoint = 3;
             rightEndpoint = this.board.size() - 4;
         }
-        if (loggingLevel1) {
+        if (false) {
             System.out.println("leftEndpoint: " + leftEndpoint + ",  rightEndpoint: " + rightEndpoint);
         }
         return new YourSolver.SnakeParams(snakeSmall, proximity, leftEndpoint, rightEndpoint);
@@ -501,7 +513,10 @@ public class YourSolver implements Solver<Board> {
 //        arrangedSnake.addAll(arrangeSnake(snake));
         this.tail = this.board.get(Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT).get(0);
 
-        tailToHeadDistanceIsOkay = head.distance(tail) <= headToTailAllowedDistance;
+        tailToHeadDistanceIsVeryMinimum = head.distance(tail) <= headToTailMinimumAllowedDistance;
+        tailToHeadDistanceIsOkay = head.distance(tail) <= headToTailGoodDistance;
+        if(snake.size() > 60){headToAppleProximity = 1;}
+
         appleTailStonePathsNotFound = pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty();
 
 
@@ -551,7 +566,6 @@ public class YourSolver implements Solver<Board> {
 
     public void choosePath() {
 
-
 // если змея опасно-громадная:
         if (snake.size() > maximumAllowedSnakeSize) {
             if (!pathToApple.isEmpty()
@@ -581,30 +595,22 @@ public class YourSolver implements Solver<Board> {
 
 
             //блочёк направления на хвост:
-            if (pathToApple.isEmpty() && !pathToTail.isEmpty() && tailToHeadDistanceIsOkay) {
+            if (pathToApple.isEmpty() && !pathToTail.isEmpty() && tailToHeadDistanceIsVeryMinimum) {
                 if (loggingLevel1) {
-                    System.out.println("path to apple is empty, but found pathToTail! Before Heading to tail проверим, можно ли увеличить разрыв между головой и хвостом:");
+                    System.out.println("path to apple is empty, but found pathToTail!  Distance head-tail is veryMinimum. Before Heading to tail проверим, можно ли увеличить разрыв между головой и хвостом:");
                 }
+                tryToEncreaseHeadTailDistanceWhileWalkToTail();
 
-
-//суб-блочёк попытки увеличения разрыва между головой и хвостом:
-                Set<Dijkstra.Vertex> visited = new HashSet<>();
-                Dijkstra.Vertex currentHeadVertex = getTargetFromGraph(graphTail, head);
-                int currentSpaceAroundHead = countSpaceAround(currentHeadVertex, visited);
-                if (head.distance(tail) < 4 && currentSpaceAroundHead > 20) {
-//при движении "на хвост", все же стараемся добавить разрыв в цепочку между головой и хвостом на случай, если
-// голова проходит рядом с относительно свободной зоной - для того, чтобы постепенно увеличивать расстояние между
-//  головой и хвостом. Этот разрыв в расстоянии обеспечит возможность укусить яблоко в трудно-доступных
-// местах и избежать бесконечной зацикленности похода на хвост.
-                    this.chosenPath = TO_DETOUR;
-                    System.out.println("находимся в режиме похода на хвост, но сделали шажок в сторону в to_detour, тобы увеличить разрыв между головой и хвостом");
-                } else {//если разрыв голова-хвост достаточный или нет места для похода в detour -продолжаем идти к хвосту
-                    System.out.println("увеличить разрыв не получилось - направляемся на хвост");
-                    this.chosenPath = TO_TAIL;
+            } else if (pathToApple.isEmpty() && !pathToTail.isEmpty() && tailToHeadDistanceIsOkay) {
+                if (loggingLevel1) {
+                    System.out.println("path to apple is empty, but found pathToTail!  Distance head-tail is okay. Heading to tail");
                 }
+                chosenPath = TO_TAIL;
+
+            }
 
 
-            } else if (pathToApple.isEmpty() && pathToTail.isEmpty() && !pathToStone.isEmpty()) {
+                else if (pathToApple.isEmpty() && pathToTail.isEmpty() && !pathToStone.isEmpty()) {
                 if (loggingLevel1) {
                     System.out.println("Paths to apple and tail are empty!  Heading to stone");
                 }
@@ -621,6 +627,25 @@ public class YourSolver implements Solver<Board> {
             System.out.println("chosen currentPath: " + chosenPath);
         }
 
+    }
+
+    public void tryToEncreaseHeadTailDistanceWhileWalkToTail() {
+        //суб-блочёк попытки увеличения разрыва между головой и хвостом:
+        Set<Dijkstra.Vertex> visited = new HashSet<>();
+        Dijkstra.Vertex currentHeadVertex = getTargetFromGraph(graphTail, head);
+        int currentSpaceAroundHead = countSpaceAround(currentHeadVertex, visited);
+        System.out.println("currentSpaceAroundHead= " + currentSpaceAroundHead);
+        if (head.distance(tail) < 4 && currentSpaceAroundHead > 20) {
+//при движении "на хвост", все же стараемся добавить разрыв в цепочку между головой и хвостом на случай, если
+// голова проходит рядом с относительно свободной зоной - для того, чтобы постепенно увеличивать расстояние между
+//  головой и хвостом. Этот разрыв в расстоянии обеспечит возможность укусить яблоко в трудно-доступных
+// местах и избежать бесконечной зацикленности похода на хвост.
+            this.chosenPath = TO_DETOUR;
+            System.out.println("находимся в режиме похода на хвост, но сделали шажок в сторону в to_detour, тобы увеличить разрыв между головой и хвостом");
+        } else {//если разрыв голова-хвост достаточный или нет места для похода в detour -продолжаем идти к хвосту
+            System.out.println("увеличить разрыв не получилось - направляемся на хвост");
+            this.chosenPath = TO_TAIL;
+        }
     }
 
     public void setPath() {
@@ -661,10 +686,10 @@ public class YourSolver implements Solver<Board> {
     }
 
     public void decideIfWeGoToApple() { //метод проверяет есть ли вокруг яблока достаточно места и решает, может пойти на хвост или на камень
+        Dijkstra.Vertex appleV = getTargetFromGraph(graphApple, apple);
         Set<Dijkstra.Vertex> visited = new HashSet<>();
-        Dijkstra.Vertex appleV = getTargetFromGraph(graphStone, apple);//нужно брать именно граф с камнем, т.к. камень мешает "видеть" выход к другим свободным местам
         freeSpaceAroundApple = countSpaceAround(appleV, visited);
-
+        System.out.println("in decideIfWeGoToApple -> freeSpaceAroundApple: " + freeSpaceAroundApple);
         if (freeSpaceAroundApple >= minimumReqAmntOfStepsAroundThePoint) {
             if (loggingLevel1) {
                 System.out.println("path to apple found, freeSpaceAround >= requiredVertexMinimum\n heading to: apple");
@@ -676,7 +701,7 @@ public class YourSolver implements Solver<Board> {
                     System.out.println("path to apple found, pathToTail found");
                     System.out.println("but can't go for apple, as freeSpaceAround < requiredVertexMinimum или расстояние от головы до хвоста меньше двух");
                 }
-                if (tailToHeadDistanceIsOkay) {//обязательно чтобы голова и хвост не были совсем рядом-иначе были случаи что умирала
+                if (tailToHeadDistanceIsVeryMinimum) {//обязательно чтобы голова и хвост не были совсем рядом-иначе были случаи что умирала
                     if (loggingLevel1) {
                         System.out.println("расстояние от головы до хваста меньше двух. Не выполнилось: if (head.distance(tail)<= 3)");
                     }

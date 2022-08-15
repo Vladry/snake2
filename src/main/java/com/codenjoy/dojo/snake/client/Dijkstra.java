@@ -90,9 +90,7 @@ public class Dijkstra {
     }
 
     public static void computeGraph(Vertex source, Point to) {
-        if (to != null) {
-        }
-        PriorityQueue<Vertex> q = new PriorityQueue<>();
+           PriorityQueue<Vertex> q = new PriorityQueue<>();
         source.minWeight = 0;
         q.offer(source);
         while (!q.isEmpty()) {

@@ -41,11 +41,12 @@ public class YourSolver implements Solver<Board> {
     LinkedList<Point> pathToDetour = new LinkedList<>();
 
     int cycleCounterBeforeWalkingToStone = 0;
-    int minimumReqAmntOfStepsAroundThePoint = 40; //минимальное кол-во вершин доступных для прохода по пути path в случае выхода после достижения яблока или камня
+    int minimumReqAmntOfStepsAroundThePoint = 30; //минимальное кол-во вершин доступных для прохода по пути path в случае выхода после достижения яблока или камня
+    int maximumAllowedSnakeSize = 150;
+
     int freeSpaceAroundApple = 0;
     int freeSpaceAroundStone = 0;
     int freeSpaceAroundTail = 0;
-    int maximumAllowedSnakeSize = 0;
     //    LinkedList<Point> arrangedSnake = new LinkedList<>();
     Path chosenPath;
 
@@ -57,7 +58,7 @@ public class YourSolver implements Solver<Board> {
     boolean tailToHeadDistanceIsOkay = false;
     boolean appleTailStonePathsNotFound = false;
     int headToTailMinimumAllowedDistance = 1;
-    int headToTailGoodDistance = 4;
+    int headToTailGoodDistance = 10;
 
     int headToAppleProximity = 2;
 
@@ -90,7 +91,7 @@ public class YourSolver implements Solver<Board> {
             if (loggingLevel2) {
                 System.out.println("nextStep before possible check in selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple: " + nextStep);
             }
-            Point checkedNextStep = selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple(nextStep);
+            Point checkedNextStep = selectFinalDiagonalStepOutOfPossibleTwoWhenHeadNearApple(nextStep);
             if (loggingLevel2) {
                 System.out.println("checkedNextStep из которого получаем dir: " + checkedNextStep);
             }
@@ -171,22 +172,30 @@ public class YourSolver implements Solver<Board> {
             return nextStep;
         }
 
+        Point left = new PointImpl(this.head.getX() - 1, this.head.getY());
+        Point right = new PointImpl(this.head.getX() + 1, this.head.getY());
 
         Set<Dijkstra.Vertex> visited = new HashSet<>();
         int probeToLeft = countSpaceAround(new Dijkstra.Vertex(
-                new PointImpl(this.head.getX() - 1, this.head.getY())), visited);
+                left), visited);
         visited = new HashSet<>();
         int probeToRight = countSpaceAround(new Dijkstra.Vertex(
-                new PointImpl(this.head.getX() + 1, this.head.getY())), visited);
+                right), visited);
         boolean foldToLeftIsAllowed = false;
         boolean foldToRightIsAllowed = false;
-        if (probeToLeft > probeToRight) {
+        boolean targetIsReachableFromLeft = checkLeftOrRightTraverse(left, target);
+        boolean targetIsReachableFromRight = checkLeftOrRightTraverse(right, target);
+
+        //TODO вставляем эмуляцию пробируемого хода на предмет продолжения видимости target-а из головы
+
+
+        if (probeToLeft > probeToRight && targetIsReachableFromLeft) {
             foldToLeftIsAllowed = true;
             System.out.println("-> foldToLeftIsAllowed = true");
-        } else if (probeToLeft < probeToRight) {
+        } else if (probeToLeft < probeToRight && targetIsReachableFromRight) {
             foldToRightIsAllowed = true;
             System.out.println("-> foldToRightIsAllowed = true");
-        } else if (probeToLeft == probeToRight) {
+        } else if (probeToLeft == probeToRight && targetIsReachableFromLeft && targetIsReachableFromRight) {
             foldToLeftIsAllowed = true;
             foldToRightIsAllowed = true;
             System.out.println("-> both: foldToLeftIsAllowed and foldToRightIsAllowed = true ");
@@ -328,7 +337,32 @@ public class YourSolver implements Solver<Board> {
         return vertexCounter;
     }
 
-    public Point selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple(Point recommendedStep) {
+    public boolean checkLeftOrRightTraverse(Point from, Point to) {
+        if (loggingLevel2) {
+            System.out.println("in checkLeftOrRightTraverse");
+            System.out.println("checking option of nextStep: " + from);
+        }
+        List<Dijkstra.Vertex> emulatedTailGraph =
+                getEmulatedTaleGraphStage1(from);//отключили probed от tail-графа (типа шагнули туда)
+        Dijkstra.Vertex toVertex = getTargetFromGraph(emulatedTailGraph, to);
+        Dijkstra.computeGraph(new Dijkstra.Vertex(from), to);
+
+        List<Point> probedPathToTarget = Dijkstra.buildPath(toVertex);
+
+        if (!probedPathToTarget.isEmpty()) {
+            System.out.println("FOUND a path from probedPoint "+from +" to target: " + to);
+            System.out.println("quitting from checkLeftOrRightTraverse");
+            return true;
+        } else {
+            System.out.println("NOT found a path from probedPoint "+from +" to target: " + to);
+            System.out.println("quitting from checkLeftOrRightTraverse");
+            return false;
+        }
+
+    }
+
+
+    public Point selectFinalDiagonalStepOutOfPossibleTwoWhenHeadNearApple(Point recommendedStep) {
 
         Point NextStepStage1 = recommendedStep;
         if ( // Эту проверку выполняем ТОЛЬКО когда голова находится по-диагонали рядом с яблоком, иначе возвращаем неизменённый nextStep
@@ -348,8 +382,8 @@ public class YourSolver implements Solver<Board> {
             List<Dijkstra.Vertex> emulatedTailGraphOption2Stage1 =
                     getEmulatedTaleGraphStage1(stepOption2);
 
-            Dijkstra.Vertex appleVertInEmulatedTailGraphOption1Step1 = getTargetFromGraph(emulatedTailGraphOption1Stage1, head);
-            Dijkstra.Vertex appleVertInEmulatedTailGraphOption2Step1 = getTargetFromGraph(emulatedTailGraphOption2Stage1, head);
+            Dijkstra.Vertex appleVertInEmulatedTailGraphOption1Step1 = getTargetFromGraph(emulatedTailGraphOption1Stage1, apple);
+            Dijkstra.Vertex appleVertInEmulatedTailGraphOption2Step1 = getTargetFromGraph(emulatedTailGraphOption2Stage1, apple);
             Set<Dijkstra.Vertex> visted = new HashSet<Dijkstra.Vertex>();
             int firstOptionStage1 = countSpaceAround(appleVertInEmulatedTailGraphOption1Step1, visted);
             visted = new HashSet<Dijkstra.Vertex>();
@@ -513,9 +547,15 @@ public class YourSolver implements Solver<Board> {
 //        arrangedSnake.addAll(arrangeSnake(snake));
         this.tail = this.board.get(Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT).get(0);
 
-        tailToHeadDistanceIsVeryMinimum = head.distance(tail) <= headToTailMinimumAllowedDistance;
-        tailToHeadDistanceIsOkay = head.distance(tail) <= headToTailGoodDistance;
-        if(snake.size() > 60){headToAppleProximity = 1;}
+        tailToHeadDistanceIsVeryMinimum =
+                head.distance(tail) >= headToTailMinimumAllowedDistance
+                        && head.distance(tail) < headToTailGoodDistance;
+
+        tailToHeadDistanceIsOkay = head.distance(tail) >= headToTailGoodDistance;
+
+        if (snake.size() > 60) {
+            headToAppleProximity = 2;
+        }
 
         appleTailStonePathsNotFound = pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty();
 
@@ -533,8 +573,6 @@ public class YourSolver implements Solver<Board> {
 //            this.tail = arrangedSnake.get(arrangedSnake.size() - 1);
 //        }
 
-        this.minimumReqAmntOfStepsAroundThePoint = 30;
-        this.maximumAllowedSnakeSize = 150;
     }
 
     public void createAndComputeGraphs() {
@@ -565,7 +603,7 @@ public class YourSolver implements Solver<Board> {
     }
 
     public void choosePath() {
-
+        System.out.println("in choosePath()");
 // если змея опасно-громадная:
         if (snake.size() > maximumAllowedSnakeSize) {
             if (!pathToApple.isEmpty()
@@ -607,10 +645,7 @@ public class YourSolver implements Solver<Board> {
                 }
                 chosenPath = TO_TAIL;
 
-            }
-
-
-                else if (pathToApple.isEmpty() && pathToTail.isEmpty() && !pathToStone.isEmpty()) {
+            } else if (pathToApple.isEmpty() && pathToTail.isEmpty() && !pathToStone.isEmpty()) {
                 if (loggingLevel1) {
                     System.out.println("Paths to apple and tail are empty!  Heading to stone");
                 }
@@ -625,6 +660,7 @@ public class YourSolver implements Solver<Board> {
             }
         if (loggingLevel3) {
             System.out.println("chosen currentPath: " + chosenPath);
+            System.out.println("quitting choosePath()");
         }
 
     }
@@ -635,7 +671,7 @@ public class YourSolver implements Solver<Board> {
         Dijkstra.Vertex currentHeadVertex = getTargetFromGraph(graphTail, head);
         int currentSpaceAroundHead = countSpaceAround(currentHeadVertex, visited);
         System.out.println("currentSpaceAroundHead= " + currentSpaceAroundHead);
-        if (head.distance(tail) < 4 && currentSpaceAroundHead > 20) {
+        if (currentSpaceAroundHead >= 20) {
 //при движении "на хвост", все же стараемся добавить разрыв в цепочку между головой и хвостом на случай, если
 // голова проходит рядом с относительно свободной зоной - для того, чтобы постепенно увеличивать расстояние между
 //  головой и хвостом. Этот разрыв в расстоянии обеспечит возможность укусить яблоко в трудно-доступных
@@ -940,9 +976,9 @@ public class YourSolver implements Solver<Board> {
 
     }
 
-    public Dijkstra.Vertex getTargetFromGraph(List<Dijkstra.Vertex> graphTemp, Point target) {
+    public Dijkstra.Vertex getTargetFromGraph(List<Dijkstra.Vertex> graphTemp, Point searchedElement) {
         return graphTemp.stream().filter(
-                        (v) -> (v.point.equals(target)))
+                        (v) -> (v.point.equals(searchedElement)))
                 .findFirst().orElse(null);
     }
 

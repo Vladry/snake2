@@ -41,7 +41,7 @@ public class YourSolver implements Solver<Board> {
     LinkedList<Point> pathToDetour = new LinkedList<>();
 
     int cycleCounterBeforeWalkingToStone = 0;
-    int minimumReqAmntOfStepsAroundThePoint = 30; //минимальное кол-во вершин доступных для прохода по пути path в случае выхода после достижения яблока или камня
+    int minimumReqAmntOfStepsAroundThePoint = 40; //минимальное кол-во вершин доступных для прохода по пути path в случае выхода после достижения яблока или камня
     int maximumAllowedSnakeSize = 150;
 
     int freeSpaceAroundApple = 0;
@@ -185,9 +185,6 @@ public class YourSolver implements Solver<Board> {
         boolean foldToRightIsAllowed = false;
         boolean targetIsReachableFromLeft = checkLeftOrRightTraverse(left, target);
         boolean targetIsReachableFromRight = checkLeftOrRightTraverse(right, target);
-
-        //TODO вставляем эмуляцию пробируемого хода на предмет продолжения видимости target-а из головы
-
 
         if (probeToLeft > probeToRight && targetIsReachableFromLeft) {
             foldToLeftIsAllowed = true;
@@ -350,11 +347,11 @@ public class YourSolver implements Solver<Board> {
         List<Point> probedPathToTarget = Dijkstra.buildPath(toVertex);
 
         if (!probedPathToTarget.isEmpty()) {
-            System.out.println("FOUND a path from probedPoint "+from +" to target: " + to);
+            System.out.println("FOUND a path from probedPoint " + from + " to target: " + to);
             System.out.println("quitting from checkLeftOrRightTraverse");
             return true;
         } else {
-            System.out.println("NOT found a path from probedPoint "+from +" to target: " + to);
+            System.out.println("NOT found a path from probedPoint " + from + " to target: " + to);
             System.out.println("quitting from checkLeftOrRightTraverse");
             return false;
         }
@@ -507,9 +504,9 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("snakeMedium, ");
             }
             snakeSmall = false;
-            proximity = 4;
+            proximity = 7;
             leftEndpoint = 6;
-            rightEndpoint = this.board.size() - 7;
+            rightEndpoint = this.board.size() - 6;
         }
 
         if (snakeLength >= mediumStartPoint/*35*/
@@ -671,7 +668,7 @@ public class YourSolver implements Solver<Board> {
         Dijkstra.Vertex currentHeadVertex = getTargetFromGraph(graphTail, head);
         int currentSpaceAroundHead = countSpaceAround(currentHeadVertex, visited);
         System.out.println("currentSpaceAroundHead= " + currentSpaceAroundHead);
-        if (currentSpaceAroundHead >= 20) {
+        if (currentSpaceAroundHead > minimumReqAmntOfStepsAroundThePoint) {
 //при движении "на хвост", все же стараемся добавить разрыв в цепочку между головой и хвостом на случай, если
 // голова проходит рядом с относительно свободной зоной - для того, чтобы постепенно увеличивать расстояние между
 //  головой и хвостом. Этот разрыв в расстоянии обеспечит возможность укусить яблоко в трудно-доступных
@@ -735,48 +732,43 @@ public class YourSolver implements Solver<Board> {
             if (!pathToTail.isEmpty()) {
                 if (loggingLevel1) {
                     System.out.println("path to apple found, pathToTail found");
-                    System.out.println("but can't go for apple, as freeSpaceAround < requiredVertexMinimum или расстояние от головы до хвоста меньше двух");
+                    System.out.println("but can't go for apple, as freeSpaceAround < requiredVertexMinimum");
                 }
                 if (tailToHeadDistanceIsVeryMinimum) {//обязательно чтобы голова и хвост не были совсем рядом-иначе были случаи что умирала
                     if (loggingLevel1) {
                         System.out.println("расстояние от головы до хваста меньше двух. Не выполнилось: if (head.distance(tail)<= 3)");
                     }
-                    System.out.println("heading to stone or detour");
-                    forwardToStoneOrDetour();
+                    System.out.println("heading to detour");
+                    this.chosenPath = TO_DETOUR;//всё равно есть pathToTail -а значит любой из шагов будет верным, т.к. в след. шаг мы снова пойдем на хвост
                 } else {
                     System.out.println("heading to tail");
                     this.chosenPath = TO_TAIL;
                 }
-            } else {//это опасный случай, когда ничего не найдено кроме пути к яблоку.
-                // TODO это очень опасный случай - продумать его для разной длины змейки, может включить поиск "уменьшённого хвоста"
-                forwardToStoneOrDetour();
+            } else {
+                forwardToDetourOrStone();
             }
 
     }
 
-    public void forwardToStoneOrDetour() {
+    public void forwardToDetourOrStone() {
         if (loggingLevel1) {
-            System.out.println("in forwardToStoneOrDetour");
+            System.out.println("in forwardToDetourOrStone");
         }
-        if (!pathToStone.isEmpty()) {
+        if (findBestDetour(head)!=null) {
             if (loggingLevel1) {
-                System.out.println("heading to stone");
+                System.out.println("heading to detour");
             }
-            this.chosenPath = TO_STONE;
+            this.chosenPath = TO_DETOUR;
         } else {
-            Point detour = findBestDetour(head);
-            if (detour != null) {
-                currentPath.clear();
-                currentPath.add(detour);//сначала поищем, а есть ли другие пустые холостые ходы
-                this.chosenPath = TO_DETOUR;
-            } else {// ну, это уже полная пизда, если даже и detour не найден, то-вздох перед смертью...
+            if (!pathToStone.isEmpty()) {
                 if (loggingLevel1) {
-                    System.out.println("настала полная пизда...");
+                    System.out.println("heading to stone");
                 }
-                currentPath = pathToApple;
+                this.chosenPath = TO_STONE;
             }
         }
     }
+
 
     public String convertNextStepToDirection(Point nextStep) {
         // метод работает как часы! Я сверял.

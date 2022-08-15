@@ -7,6 +7,7 @@ import com.codenjoy.dojo.snake.model.Elements;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static com.codenjoy.dojo.snake.client.Path.*;
@@ -53,6 +54,11 @@ public class YourSolver implements Solver<Board> {
     boolean loggingLevel2 = true;
     boolean loggingLevel3 = true;
 
+    boolean tailToHeadDistanceIsOkay = false;
+    boolean appleTailStonePathsNotFound = false;
+    int headToTailAllowedDistance = 1;
+
+
     public YourSolver(Dice dice) {
         this.dice = dice;
     }
@@ -98,8 +104,219 @@ public class YourSolver implements Solver<Board> {
     // -------------------методы--------------------------
 
 
+    public Point getNextStep(List<Point> currentPath) {
+        if (loggingLevel3) {
+            System.out.println("in getNextStep(), currentPath: " + currentPath);
+        }
+        Point nextStep = null;
+        if (!currentPath.isEmpty()) {
+            nextStep = currentPath.get(0);
+            if (loggingLevel3) {
+                System.out.println("nextStep is taken from currentPath and is:  " + currentPath);
+            }
+        } else {
+            nextStep = findBestDetour(this.board.getHead());
+            this.currentPath.add(nextStep);//обязательно в пустой путь вложить, иначе не найдется target в аргументе z_Folder
+            if (loggingLevel3) {
+                System.out.println("currentPath был пустой. nextStep взяли findBestDetour(): " + nextStep);
+                System.out.println("и положили nextStep в currentPath");
+            }
+        }
+
+
+        //----------------блок выбора режима прохода, в зависимости от длины змеи:
+        // по длине змейки получаем нужные params для задания режима дальнейшей работы
+        YourSolver.SnakeParams modeParams = getSnakeParams(board.getSnake().size());
+
+        // режим прямого поиска яблока по Дейкстре (пока змейка маленькая):
+        if (modeParams.snakeSmall) {
+            if (loggingLevel1) {
+                System.out.println("змея короче чем smallEndPoint, поэтому nextStep остаётся = currentPath.get(0)");
+            }
+        } else {// режим скручивания в змеевик (когда змейка подросла):
+            if (loggingLevel1) {
+                System.out.println("змея длиннее чем smallEndPoint, поэтому отсылаем nextStep на обработку в z_Folder");
+                System.out.println("calling next step = z_Folder(nextStep:" + nextStep + ")");
+            }
+            Point target = this.currentPath.get(currentPath.size() - 1);
+            nextStep = z_Folder(nextStep, target, modeParams.proximity, modeParams.leftEndpoint, modeParams.rightEndpoint);
+            if (loggingLevel1) {
+                System.out.println("змея длиннее чем smallEndPoint");
+                System.out.println("nextStep from z_Folder: " + nextStep);
+            }
+        }
+        if (loggingLevel1) {
+            System.out.println("returning nextStep from getNextStep(): " + nextStep);
+        }
+        return nextStep;
+    }
+
+
+    public Point z_Folder(Point nextStepFromCurrentPath, Point target, int proximity, int leftEndpoint, int rightEndpoint) {
+        System.out.println("in z_Folder(nextStepFromCurrentPath:" + nextStepFromCurrentPath + ", target: " + target + ", proximity: " + proximity + ") -> currentPath: " + currentPath);
+        Point head = board.getHead();
+        Point nextStep = null;
+        String dir = null;
+
+        if (nextStepFromCurrentPath == target) { //всего одно значение в currentPath - это признак того, что
+// либо сейчас укусим яблоко, либо что мы пришли сюда из findBestDetour.
+// поэтому сразу выходим из z_Folder не меняя nextStepFromCurrentPath
+            nextStep = nextStepFromCurrentPath;
+            if (loggingLevel1) {
+                System.out.println("in getZdirection. return nextStep:" + nextStep);
+            }
+            return nextStep;
+        }
+
+
+        Set<Dijkstra.Vertex> visited = new HashSet<>();
+        int probeToLeft = countSpaceAround(new Dijkstra.Vertex(
+                new PointImpl(this.head.getX() - 1, this.head.getY())), visited);
+        visited = new HashSet<>();
+        int probeToRight = countSpaceAround(new Dijkstra.Vertex(
+                new PointImpl(this.head.getX() + 1, this.head.getY())), visited);
+        boolean foldToLeftIsAllowed = false;
+        boolean foldToRightIsAllowed = false;
+        if (probeToLeft > probeToRight) {
+            foldToLeftIsAllowed = true;
+            System.out.println("-> foldToLeftIsAllowed = true");
+        } else if (probeToLeft < probeToRight) {
+            foldToRightIsAllowed = true;
+            System.out.println("-> foldToRightIsAllowed = true");
+        } else if (probeToLeft == probeToRight) {
+            foldToLeftIsAllowed = true;
+            foldToRightIsAllowed = true;
+            System.out.println("-> both: foldToLeftIsAllowed and foldToRightIsAllowed = true ");
+        }
+
+        // если унюхали поблизости яблоко -хватаем его!
+//proximity- длина "нюха" по оси Y: прямой ход по Дейкстре разрешен без скрутки в змеевик, пока Y более proximity
+        if (Math.abs(head.getY() - target.getY()) > proximity
+                || board.isNear(head, Elements.BAD_APPLE) //ни дай Бог рядом камень - может произойти сбой, поэтому не дуркуем и идем по маршруту!
+                || Math.abs(head.getY() - target.getY()) <= 2 //сожрать яблоко, когда голова уже на соседней строке с яблоком при ЛЮБОМ proximity
+        ) {
+            nextStep = nextStepFromCurrentPath;
+            if (loggingLevel1) {
+                System.out.println("proximity: " + proximity);
+                System.out.println("deltaY head vs apple: " + Math.abs(head.getY() - apple.getY()));
+                System.out.println("малый proximity, либо рядом камень -> suggestedNextStep: " + nextStep);
+            }
+        } else //иначе проверяем
+            // складываем змейку в змеевик
+
+
+            if (board.isAt(head.getX() - 1, head.getY(), Elements.NONE, Elements.GOOD_APPLE)
+                    && head.getX() > leftEndpoint
+
+                    &&
+                    //и обязательно, чтобы были свободны козырьки сверху либо снизу
+                    (board.isAt(head.getX() - 1, head.getY() - 1, Elements.NONE, Elements.GOOD_APPLE)
+                            ||
+                            board.isAt(head.getX() - 1, head.getY() + 1, Elements.NONE, Elements.GOOD_APPLE))
+
+                    &&
+                    //и чтобы козырёк снизу не был при яблоке ниже головы
+                    !(!board.isAt(head.getX() - 1, head.getY() - 1, Elements.NONE, Elements.GOOD_APPLE)
+                            &&
+                            head.getY() > target.getY())
+
+                    &&
+                    //и чтобы козырёк вверху не был при яблоке выше головы
+                    !(!board.isAt(head.getX() - 1, head.getY() + 1, Elements.NONE, Elements.GOOD_APPLE)
+                            &&
+                            head.getY() < target.getY())
+
+                    && foldToLeftIsAllowed
+            ) {
+                nextStep = new PointImpl(head.getX() - 1, head.getY());
+                if (loggingLevel1) {
+                    System.out.println("складываем змеевик- один шаг влево: " + nextStep);
+                }
+            } else if (board.isAt(head.getX() + 1, head.getY(), Elements.NONE, Elements.GOOD_APPLE)
+                    && head.getX() < rightEndpoint
+
+
+                    &&
+                    //и обязательно, чтобы были свободны козырьки сверху либо снизу
+                    (board.isAt(head.getX() + 1, head.getY() - 1, Elements.NONE, Elements.GOOD_APPLE)
+                            ||
+                            board.isAt(head.getX() + 1, head.getY() + 1, Elements.NONE, Elements.GOOD_APPLE))
+
+                    &&
+                    //и чтобы козырёк снизу не был при яблоке ниже головы
+                    !(!board.isAt(head.getX() + 1, head.getY() - 1, Elements.NONE, Elements.GOOD_APPLE)
+                            &&
+                            head.getY() > target.getY())
+
+                    &&
+                    //и чтобы козырёк вверху не был при яблоке выше головы
+                    !(!board.isAt(head.getX() + 1, head.getY() + 1, Elements.NONE, Elements.GOOD_APPLE)
+                            &&
+                            head.getY() < target.getY())
+                    && foldToRightIsAllowed
+
+            ) {
+                nextStep = new PointImpl(head.getX() + 1, head.getY());
+                if (loggingLevel1) {
+                    System.out.println("складываем змеевик- один шаг вправо: " + nextStep);
+                }
+            } else {
+                nextStep = nextStepFromCurrentPath;
+                if (loggingLevel1) {
+                    System.out.println("-> почему-то не смогли сложить в змеевик- устанавливаем nextStep: " + nextStep);
+                }
+            }
+
+
+        if (loggingLevel1) {
+            System.out.println("in getZdirection. return nextStep:" + nextStep);
+        }
+        return nextStep;
+    }
+
+    public Point findBestDetour(Point from) {// метод может вернуть null
+        if (loggingLevel3) {
+            System.out.println("in findBestDetour");
+        }
+        // сюда отправляем nextStep в случаях, когда никакие пути не найдены или являются опасными
+        Dijkstra.Vertex headV = this.graphApple.stream().filter((v) -> v.point.equals(from)).findFirst().orElse(null);
+//        System.out.println("headV found: " + headV.point);
+        Dijkstra.Vertex bestVertex = null;
+        int foundInPrevCycle = 0;
+        for (Dijkstra.Edge e : headV.edges) {
+            Dijkstra.Vertex currentCycleVertex = e.v; //взяли последнее попавшееся, на случай, если потом не найдем лУчшего хода, иначе вернулся бы null
+            if (loggingLevel1) {
+                System.out.println("checking sub-vertex: " + e.v.point);
+            }
+//берем у головы все её три смежные вершины и, в цикле ищем, для какой вершины будет макс.число totalVertexesFound. Эту вершины и возвращаем как bestVertex
+            Set<Dijkstra.Vertex> visited = new HashSet<>();
+            int vertCount = countSpaceAround(e.v, visited);
+            if (loggingLevel1) {
+                System.out.println("a headBranch " + e.v.point + " has " + vertCount + " sub-branches");
+                System.out.println("visited.size(): " + visited.size());
+            }
+            if (vertCount > foundInPrevCycle) {
+                foundInPrevCycle = vertCount;
+                bestVertex = currentCycleVertex;
+            }
+        }
+        if (loggingLevel1) {
+            System.out.println("exiting findBestDetour.  Возвращаем bestVertex= " + bestVertex.point);
+        }
+        return bestVertex.point;
+    }
+
+    public int countSpaceAround(Dijkstra.Vertex current, Set<Dijkstra.Vertex> visited) {
+        if (current == null || visited.contains(current)) return 0;
+        visited.add(current);
+        int vertexCounter = 1;
+        for (Dijkstra.Edge e : current.edges) {
+            vertexCounter += countSpaceAround(e.v, visited);
+        }
+        return vertexCounter;
+    }
+
     public Point selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple(Point recommendedStep) {
-        System.out.println("in selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple(" + recommendedStep + ")");
 
         Point NextStepStage1 = recommendedStep;
         if ( // Эту проверку выполняем ТОЛЬКО когда голова находится по-диагонали рядом с яблоком, иначе возвращаем неизменённый nextStep
@@ -110,6 +327,7 @@ public class YourSolver implements Solver<Board> {
 
 
             if (loggingLevel2) {
+                System.out.println("in selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple(" + recommendedStep + ")");
                 System.out.println("два потенциальных шага на выбор: " + stepOption1 + " и " + stepOption2);
 //                System.out.println("!!! distance between head and apple: " + nextStep.distance(apple));
             }
@@ -149,90 +367,6 @@ public class YourSolver implements Solver<Board> {
         return NextStepStage1;
     }
 
-
-    /*public Point selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple(Point nextStep) {
-        System.out.println("in selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple(" + nextStep + ")");
-
-        boolean option1Stage1 = false, option2Stage1 = false;
-        Point NextStepStage1 = null;
-        Point NextStepStage2 = null;
-        Point finalNextStep = nextStep;
-        if ( // Эту проверку выполняем ТОЛЬКО когда голова находится по-диагонали рядом с яблоком, иначе возвращаем неизменённый nextStep
-                Math.abs(head.getX() - apple.getX()) == 1 && Math.abs(head.getY() - apple.getY()) == 1
-        ) {
-            Point stepOption1 = new PointImpl(head.getX(), apple.getY());
-            Point stepOption2 = new PointImpl(apple.getX(), head.getY());
-
-
-            if (loggingLevel2) {
-                System.out.println("два потенциальных шага на выбор: " + stepOption1 + " и " + stepOption2);
-//                System.out.println("!!! distance between head and apple: " + nextStep.distance(apple));
-            }
-            List<Dijkstra.Vertex> emulatedTailGraphOption1Stage1 =
-                    getEmulatedTaleGraphStage1(stepOption1);
-            List<Dijkstra.Vertex> emulatedTailGraphOption2Stage1 =
-                    getEmulatedTaleGraphStage1(stepOption2);
-
-            Dijkstra.Vertex appleVertInEmulatedTailGraphOption1Step1 = getTargetFromGraph(emulatedTailGraphOption1Stage1, head);
-            Dijkstra.Vertex appleVertInEmulatedTailGraphOption2Step1 = getTargetFromGraph(emulatedTailGraphOption2Stage1, head);
-            Set<Dijkstra.Vertex> visted = new HashSet<Dijkstra.Vertex>();
-            int firstOptionStage1 = countSpaceAround(appleVertInEmulatedTailGraphOption1Step1, visted);
-            int secondOptionStage1 = countSpaceAround(appleVertInEmulatedTailGraphOption2Step1, visted);
-            if (loggingLevel2) {
-                System.out.println("freeSpaceAroundAple_stepOption1: " + firstOptionStage1);
-                System.out.println("freeSpaceAroundAple_stepOption2: " + secondOptionStage1);
-            }
-
-            if (firstOptionStage1 > secondOptionStage1) {
-                option1Stage1 = true;
-                NextStepStage1 = stepOption1;
-                if (loggingLevel2) {
-                    System.out.println("из двух опций, выбрали лучший " + NextStepStage1);
-                }
-            } else if ((firstOptionStage1 < secondOptionStage1)) {
-                option2Stage1 = true;
-                NextStepStage1 = stepOption2;
-                if (loggingLevel2) {
-                    System.out.println("из двух опций, выбрали лучший " + NextStepStage1);
-                }
-            } else if (firstOptionStage1 == secondOptionStage1) {
-                if (nextStep.equals(stepOption1)) {
-                    option1Stage1 = true;
-                } else {
-                    option2Stage1 = true;
-                }
-                NextStepStage1 = nextStep;//получили наилучший следующий шаг с точки зрения пространства вокруг яблока
-            }
-            System.out.println("окончена Stage1 in selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple с результатами:");
-            System.out.println("option1Stage1: " + option1Stage1 + ",  option2Stage1: " + option2Stage1);
-            System.out.println("NextStepStage1: " + NextStepStage1);
-//Мы проверили не запрём ли мы яблоко в малое пространство шагов. Теперь нужно проверить следующий шаг,
-//ПОСЛЕ этого сэмулированного шага, на предмет: а не запрем ли мы голову в такое пространство,
-// после сьедания яблока и не отрезав ее от хвоста.  И это БОЛЕЕ приоритетная проверка, поэтому выполняем ее последней по очереди:
-            System.out.println();
-            System.out.println("начат  Step2 in selectFinalDagonalStepOutOfPossibleTwoWhenHeadNearApple");
-
-            List<Dijkstra.Vertex> baseEmulatedTailGraphStep2 = new ArrayList<>();
-            if (option1Stage1) {
-                baseEmulatedTailGraphStep2.addAll(emulatedTailGraphOption1Stage1);
-            } else if (option2Stage1) {
-                baseEmulatedTailGraphStep2.addAll(emulatedTailGraphOption2Stage1);
-            } else {
-                System.out.println("error выбора базового emulatedStage2 графа из графов: emulatedTailGraphOption1Step1 или emulatedTailGraphOption2Step1");
-            }
-
-            List<Dijkstra.Vertex> emulatedTailGraphStage2 = getEmulatedTaleGraphStage2(baseEmulatedTailGraphStep2, apple);
-            // по задумке, в emulatedTailGraphStage2 должны быть исключены позиции 2х эмулированных шагов, а виртуальная голова должна стоять на бывшей позиции apple
-            Dijkstra.Vertex headVertInEmulatedTailGraphStage2 = getTargetFromGraph(emulatedTailGraphStage2, head);
-//TODO теперь смотрим, а выпутается ли тебе голова из второго эмулированного шага
-
-
-            //TODO Stage2 не дописан здесь!!!
-
-        }
-        return finalNextStep;//TODO сюда не попадает расчет из Stage2
-    }
-*/
     public List<Dijkstra.Vertex> getEmulatedTaleGraphStage1(Point nextStepHeadPosition) {
 //        System.out.println("disconnecting from nextStepHeadPosition: "+nextStepHeadPosition);
         List<Dijkstra.Vertex> emulatedTale_BasedGraph = new ArrayList<>();
@@ -304,218 +438,20 @@ public class YourSolver implements Solver<Board> {
         return baseEmulatedTailGraphStep2;
     }
 
-    public Point getNextStep(List<Point> currentPath) {
-        Point target, nextStep = null;
-        if (!currentPath.isEmpty()) {
-            target = currentPath.get(0);
-        } else {
-            target = findBestDetour(this.board.getHead());
-            if (loggingLevel3) {
-                System.out.println("currentPath.isEmpty(). findBestDetour= " + target);
-            }
-            return target;
-        }
-
-
-        //----------------блок выбора режима прохода, в зависимости от длины змеи:
-        // по длине змейки получаем нужные params для задания режима дальнейшей работы
-        YourSolver.SnakeParams modeParams = getSnakeParams(board.getSnake().size());
-
-        // режим прямого поиска яблока по Дейкстре (пока змейка маленькая):
-        if (modeParams.snakeSmall) {
-            if (loggingLevel1) {
-                System.out.println("змея короче чем smallEndPoint");
-            }
-            if (!currentPath.isEmpty()) {
-                nextStep = target;
-            }
-
-        } else {// режим скручивания в змеевик (когда змейка подросла):
-            if (loggingLevel1) {
-                System.out.println("змея длиннее чем smallEndPoint");
-            }
-            nextStep = getZdirection(modeParams.proximity, modeParams.leftEndpoint, modeParams.rightEndpoint);
-        }
-        //------------конец блока выбора режима прохода в зав-ти от длины змеи
-        if (loggingLevel2) {
-            System.out.println("nextStep: " + nextStep);
-        }
-        return nextStep;
-    }
-
-    public Point findBestDetour(Point from) {
-        if (loggingLevel3) {
-            System.out.println("in findBestDetour");
-        }
-        // сюда отправляем nextStep в случаях, когда никакие пути не найдены или являются опасными
-        Dijkstra.Vertex headV = this.graphApple.stream().filter((v) -> v.point.equals(from)).findFirst().orElse(null);
-//        System.out.println("headV found: " + headV.point);
-        Dijkstra.Vertex bestVertex = null;
-        Dijkstra.Vertex singleVertexFound = null;
-        int totalVertexesFound = 0;
-        for (Dijkstra.Edge e : headV.edges) {
-            singleVertexFound = e.v; //взяли первое попавшееся, на случай, если потом не найдем лучшего хода, иначе вернулся бы null
-//берем у головы все её три смежные вершины и, в цикле ищем, для какой вершины будет макс.число totalVertexesFound. Эту вершины и возвращаем как bestVertex
-//            System.out.println("inside of for-loop");
-            if (loggingLevel1) {
-                System.out.println("checking sub-vertex: " + e.v.point);
-            }
-            Set<Dijkstra.Vertex> visited = new HashSet<>();
-            int vertCount = countSpaceAround(e.v, visited);
-            if (loggingLevel1) {
-                System.out.println("a headBranch " + e.v.point + " has " + vertCount + " sub-branches");
-                System.out.println("visited.size(): " + visited.size());
-            }
-            if (vertCount > totalVertexesFound) {
-                totalVertexesFound = vertCount;
-                bestVertex = e.v;
-            }
-        }
-        if (bestVertex != null) {
-            bestVertex = singleVertexFound;
-        }
-        if (loggingLevel1) {
-            System.out.println("exiting findBestDetour.  Возвращаем bestVertex= " + bestVertex.point);
-        }
-        return bestVertex.point;
-    }
-
-    public int countSpaceAround(Dijkstra.Vertex current, Set<Dijkstra.Vertex> visited) {
-        if (current == null || visited.contains(current)) return 0;
-        visited.add(current);
-        int vertexCounter = 1;
-        for (Dijkstra.Edge e : current.edges) {
-            vertexCounter += countSpaceAround(e.v, visited);
-        }
-        return vertexCounter;
-    }
-
-    public Point getZdirection(int proximity, int leftEndpoint, int rightEndpoint) {
-        System.out.println("in getZdirection -> currentPath: "+ currentPath);
-        Point nextStepFromCurrentPath = this.currentPath.get(0);
-        Point target = this.currentPath.get(currentPath.size()-1);
-//        System.out.println("in getZdirection -> nextStepFromCurrentPath: "+ nextStepFromCurrentPath);
-//        System.out.println("in getZdirection -> target: "+ target);
-/*        if (chosenPath == TO_TAIL) {// естественно, если в данный момент мы идем "на хвост", то отменяем все наши скручивания в змеевик
-            if (loggingLevel1) {
-                System.out.println("in getZDirection-> в данный момент мы идем на хвост, поэтому скручивание в змеевик отменили. Возвращаем nextStep: " + target);
-            }
-            return target;
-        }*/
-
-        // leftEndpoint, int rightEndpoint - левый и правый ограничители ширины скручивания змеи в змеевик. Чем длиннее змея -тем шире змеевик (т.е. эти границы расширяются)
-        Point head = board.getHead();
-        Point nextStep = null;
-        String dir = null;
-
-        // если унюхали поблизости яблоко -хватаем его!
-//proximity- длина "нюха" по оси Y: прямой ход по Дейкстре разрешен без скрутки в змеевик, пока Y более proximity
-        if (Math.abs(head.getY() - target.getY()) > proximity
-                || board.isNear(head, Elements.BAD_APPLE) //ни дай Бог рядом камень - может произойти сбой, поэтому не дуркуем и идем по маршруту!
-                || Math.abs(head.getY() - target.getY()) == 0 //сожрать яблоко, когда голова на строке с яблоком при ЛЮБОМ proximity
-        ) {
-            nextStep = nextStepFromCurrentPath;
-            if (loggingLevel1) {
-                System.out.println("proximity: "+proximity);
-                System.out.println("deltaY head vs apple: "+Math.abs(head.getY()-apple.getY()));
-                System.out.println("малый proximity, либо рядом камень -> suggestedNextStep: " + nextStep);
-            }
-        } else //иначе проверяем
-            // складываем змейку в змеевик
-            if (board.isAt(head.getX() - 1, head.getY(), Elements.NONE, Elements.GOOD_APPLE)
-                    && head.getX() > leftEndpoint
-
-                    &&
-                    //и обязательно, чтобы были свободны козырьки сверху либо снизу
-                    (board.isAt(head.getX() - 1, head.getY() - 1, Elements.NONE, Elements.GOOD_APPLE)
-                            ||
-                            board.isAt(head.getX() - 1, head.getY() + 1, Elements.NONE, Elements.GOOD_APPLE))
-
-                    &&
-                    //и чтобы козырёк снизу не был при яблоке ниже головы
-                    !(!board.isAt(head.getX() - 1, head.getY() - 1, Elements.NONE, Elements.GOOD_APPLE)
-                            &&
-                            head.getY() > target.getY())
-
-                    &&
-                    //и чтобы козырёк вверху не был при яблоке выше головы
-                    !(!board.isAt(head.getX() - 1, head.getY() + 1, Elements.NONE, Elements.GOOD_APPLE)
-                            &&
-                            head.getY() < target.getY())
-
-
-            ) {
-                nextStep = new PointImpl(head.getX() - 1, head.getY());
-                if (loggingLevel1) {
-                    System.out.println("складываем змеевик- один шаг влево: " + nextStep);
-                }
-            } else if (board.isAt(head.getX() + 1, head.getY(), Elements.NONE, Elements.GOOD_APPLE)
-                    && head.getX() < rightEndpoint
-
-
-                    &&
-                    //и обязательно, чтобы были свободны козырьки сверху либо снизу
-                    (board.isAt(head.getX() + 1, head.getY() - 1, Elements.NONE, Elements.GOOD_APPLE)
-                            ||
-                            board.isAt(head.getX() + 1, head.getY() + 1, Elements.NONE, Elements.GOOD_APPLE))
-
-                    &&
-                    //и чтобы козырёк снизу не был при яблоке ниже головы
-                    !(!board.isAt(head.getX() + 1, head.getY() - 1, Elements.NONE, Elements.GOOD_APPLE)
-                            &&
-                            head.getY() > target.getY())
-
-                    &&
-                    //и чтобы козырёк вверху не был при яблоке выше головы
-                    !(!board.isAt(head.getX() + 1, head.getY() + 1, Elements.NONE, Elements.GOOD_APPLE)
-                            &&
-                            head.getY() < target.getY())
-
-
-            ) {
-                nextStep = new PointImpl(head.getX() + 1, head.getY());
-                if (loggingLevel1) {
-                    System.out.println("складываем змеевик- один шаг вправо: " + nextStep);
-                }
-            } else {
-                nextStep = nextStepFromCurrentPath;
-                if (loggingLevel1) {
-                    System.out.println("-> почему-то не смогли сложить в змеевик- устанавливаем nextStep: " + nextStep);
-                }
-            }
-
-        //TODO проверить, а есть ли выход!
-        //ниже абсолютно не понятный мне код, особенно в данном методе.
-/*        //если, в данный момент мы вдруг идём на хвост, то при складывании в змеевик, еще и проверяем, не опасно ли пойти на хвост в данном режиме:
-        Set<Dijkstra.Vertex> visited = new HashSet<>();
-        Dijkstra.Vertex stoneV = getTargetFromGraph(graphStone, nextStep);
-        freeSpaceAroundTail = countSpaceAround(stoneV, visited);
-        if (freeSpaceAroundTail < minimumReqAmntOfStepsAroundThePoint) {
-            nextStep = path.get(0);
-        }*/
-
-
-        if (loggingLevel1) {
-            System.out.println("in getZdirection. return nextStep:" + nextStep);
-        }
-        return nextStep;
-    }
-
-
     //---------------------finalized methods------------------------
     public YourSolver.SnakeParams getSnakeParams(int snakeLength) {
         boolean snakeSmall = true; //параметр для переключения с режима прямого поиска по Дейскстре в режим
         //большой змеи, когда она начинает скручиваться в змеевик и включается getStickyDirection()
 
         //ниже задаются эндпоинты для длин змеи, при которых переключаются режимы работы алгоритма скручивания в змеевик:
-        int youngStartingPoint = 25;
-        int mediumStartPoint = 35;
-        int largeStartPoint = 45;
+        int youngStartingPoint = 30;
+        int mediumStartPoint = 40;
+        int largeStartPoint = 55;
         /* расстояние прямого подхода головы к яблоку перед началом скручивания. Если 0, то скручивается еще на дальнем расстоянии от яблока
         Голова подойдет к яблоку на расстояние proximity, потом начнет скручиваться в змеевик.
         Можно это перевернуть, изменив знак на "head<target как здесь: if (Math.abs(head.getY() - target.getY()) < proximity
         Тогда proximity будет означать что голова сначала скрутится, а потом бросится к яблоку с расстояния proximity.*/
-        int proximity = 6;
+        int proximity = 0;
         int leftEndpoint = 1;//левая граница скручивания
         int rightEndpoint = this.board.size() - 1; //правая граница скручивания
 
@@ -525,7 +461,7 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("snakeMedium, ");
             }
             snakeSmall = false;
-            proximity = 6;
+            proximity = 2;
             leftEndpoint = 6;
             rightEndpoint = this.board.size() - 7;
         }
@@ -545,7 +481,7 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("snakeLarge, ");
             }
             snakeSmall = false;
-            proximity = 2;
+            proximity = 8;
             leftEndpoint = 3;
             rightEndpoint = this.board.size() - 4;
         }
@@ -564,6 +500,11 @@ public class YourSolver implements Solver<Board> {
 //        arrangedSnake = new LinkedList<>();//обязательно пересоздать, иначе добавляет новую змею в существующую старую змею
 //        arrangedSnake.addAll(arrangeSnake(snake));
         this.tail = this.board.get(Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT).get(0);
+
+        tailToHeadDistanceIsOkay = head.distance(tail) <= headToTailAllowedDistance;
+        appleTailStonePathsNotFound = pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty();
+
+
         if (loggingLevel1) {
             System.out.println("tail: " + this.tail);
         }
@@ -577,8 +518,8 @@ public class YourSolver implements Solver<Board> {
 //            this.tail = arrangedSnake.get(arrangedSnake.size() - 1);
 //        }
 
-        this.minimumReqAmntOfStepsAroundThePoint = 40;
-        this.maximumAllowedSnakeSize = 70;
+        this.minimumReqAmntOfStepsAroundThePoint = 30;
+        this.maximumAllowedSnakeSize = 150;
     }
 
     public void createAndComputeGraphs() {
@@ -609,6 +550,8 @@ public class YourSolver implements Solver<Board> {
     }
 
     public void choosePath() {
+
+
 // если змея опасно-громадная:
         if (snake.size() > maximumAllowedSnakeSize) {
             if (!pathToApple.isEmpty()
@@ -635,17 +578,38 @@ public class YourSolver implements Solver<Board> {
 
 
 //если змея НЕ опасно-громадная:
-            if (pathToApple.isEmpty() && !pathToTail.isEmpty() && head.distance(tail) > 3) {
+
+
+            //блочёк направления на хвост:
+            if (pathToApple.isEmpty() && !pathToTail.isEmpty() && tailToHeadDistanceIsOkay) {
                 if (loggingLevel1) {
-                    System.out.println("path to apple is empty, but found pathToTail!  Heading to tail");
+                    System.out.println("path to apple is empty, but found pathToTail! Before Heading to tail проверим, можно ли увеличить разрыв между головой и хвостом:");
                 }
-                this.chosenPath = TO_TAIL;
+
+
+//суб-блочёк попытки увеличения разрыва между головой и хвостом:
+                Set<Dijkstra.Vertex> visited = new HashSet<>();
+                Dijkstra.Vertex currentHeadVertex = getTargetFromGraph(graphTail, head);
+                int currentSpaceAroundHead = countSpaceAround(currentHeadVertex, visited);
+                if (head.distance(tail) < 4 && currentSpaceAroundHead > 20) {
+//при движении "на хвост", все же стараемся добавить разрыв в цепочку между головой и хвостом на случай, если
+// голова проходит рядом с относительно свободной зоной - для того, чтобы постепенно увеличивать расстояние между
+//  головой и хвостом. Этот разрыв в расстоянии обеспечит возможность укусить яблоко в трудно-доступных
+// местах и избежать бесконечной зацикленности похода на хвост.
+                    this.chosenPath = TO_DETOUR;
+                    System.out.println("находимся в режиме похода на хвост, но сделали шажок в сторону в to_detour, тобы увеличить разрыв между головой и хвостом");
+                } else {//если разрыв голова-хвост достаточный или нет места для похода в detour -продолжаем идти к хвосту
+                    System.out.println("увеличить разрыв не получилось - направляемся на хвост");
+                    this.chosenPath = TO_TAIL;
+                }
+
+
             } else if (pathToApple.isEmpty() && pathToTail.isEmpty() && !pathToStone.isEmpty()) {
                 if (loggingLevel1) {
                     System.out.println("Paths to apple and tail are empty!  Heading to stone");
                 }
                 this.chosenPath = TO_STONE;
-            } else if (pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty()) {//направляемся "куда-ни-будь"
+            } else if (appleTailStonePathsNotFound) {//направляемся "куда-ни-будь"
                 if (loggingLevel1) {
                     System.out.println("All paths are empty!");
                 }
@@ -684,9 +648,10 @@ public class YourSolver implements Solver<Board> {
 
             case TO_DETOUR:
                 if (loggingLevel3) {
-                    System.out.println("case:  TO_DETOUR");
+                    System.out.println("case:  TO_DETOUR  (выполнили здесь:  pathToDetour.clear(),  currentPath.clear()");
                 }
-                currentPath = pathToDetour;
+                pathToDetour.clear();//очистить, т.к. будет содержать предыдущий мусор
+                currentPath.clear();//очистить, чтобы сработал findPathToDetour в методе findBestDetour()
                 break;
 
             default:
@@ -708,11 +673,12 @@ public class YourSolver implements Solver<Board> {
         } else// во всех остальных случаях, вокруг яблоко НЕТ достаточного пространства и анализируем дальше:
             if (!pathToTail.isEmpty()) {
                 if (loggingLevel1) {
-                    System.out.println("path to apple found, but can't go for apple, as freeSpaceAround < requiredVertexMinimum или расстояние от головы до хваста меньше двух");
+                    System.out.println("path to apple found, pathToTail found");
+                    System.out.println("but can't go for apple, as freeSpaceAround < requiredVertexMinimum или расстояние от головы до хвоста меньше двух");
                 }
-                if (head.distance(tail) <= 3) {//обязательно чтобы голова и хвост не были совсем рядом-иначе были случаи что умирала
+                if (tailToHeadDistanceIsOkay) {//обязательно чтобы голова и хвост не были совсем рядом-иначе были случаи что умирала
                     if (loggingLevel1) {
-                        System.out.println("расстояние от головы до хваста меньше двух. Не выполнилось: if (head.distance(tail)<=1)");
+                        System.out.println("расстояние от головы до хваста меньше двух. Не выполнилось: if (head.distance(tail)<= 3)");
                     }
                     System.out.println("heading to stone or detour");
                     forwardToStoneOrDetour();
@@ -728,6 +694,9 @@ public class YourSolver implements Solver<Board> {
     }
 
     public void forwardToStoneOrDetour() {
+        if (loggingLevel1) {
+            System.out.println("in forwardToStoneOrDetour");
+        }
         if (!pathToStone.isEmpty()) {
             if (loggingLevel1) {
                 System.out.println("heading to stone");
@@ -736,8 +705,13 @@ public class YourSolver implements Solver<Board> {
         } else {
             Point detour = findBestDetour(head);
             if (detour != null) {
+                currentPath.clear();
                 currentPath.add(detour);//сначала поищем, а есть ли другие пустые холостые ходы
+                this.chosenPath = TO_DETOUR;
             } else {// ну, это уже полная пизда, если даже и detour не найден, то-вздох перед смертью...
+                if (loggingLevel1) {
+                    System.out.println("настала полная пизда...");
+                }
                 currentPath = pathToApple;
             }
         }

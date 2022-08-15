@@ -9,6 +9,8 @@ import java.util.*;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
+import static com.codenjoy.dojo.services.Direction.LEFT;
+import static com.codenjoy.dojo.services.Direction.RIGHT;
 import static com.codenjoy.dojo.snake.client.Path.*;
 
 /**
@@ -50,8 +52,8 @@ public class YourSolver implements Solver<Board> {
     //    LinkedList<Point> arrangedSnake = new LinkedList<>();
     Path chosenPath;
 
-    boolean loggingLevel1 = true;
-    boolean loggingLevel2 = true;
+    boolean loggingLevel1 = false;
+    boolean loggingLevel2 = false;
     boolean loggingLevel3 = true;
 
     boolean tailToHeadDistanceIsVeryMinimum = false;
@@ -60,8 +62,10 @@ public class YourSolver implements Solver<Board> {
     int headToTailMinimumAllowedDistance = 1;
     int headToTailGoodDistance = 10;
 
-    int headToAppleProximity = 2;
-
+    int stepCounter = 0;
+    boolean movementToLeftAllowed = false;
+    boolean movementToRightAllowed = false;
+    Direction prevousMovementDirection = null;
 
     public YourSolver(Dice dice) {
         this.dice = dice;
@@ -109,19 +113,19 @@ public class YourSolver implements Solver<Board> {
 
 
     public Point getNextStep(List<Point> currentPath) {
-        if (loggingLevel3) {
+        if (loggingLevel1) {
             System.out.println("in getNextStep(), currentPath: " + currentPath);
         }
         Point nextStep = null;
         if (!currentPath.isEmpty()) {
             nextStep = currentPath.get(0);
-            if (loggingLevel3) {
+            if (loggingLevel1) {
                 System.out.println("nextStep is taken from currentPath and is:  " + currentPath);
             }
         } else {
             nextStep = findBestDetour(this.board.getHead());
             this.currentPath.add(nextStep);//обязательно в пустой путь вложить, иначе не найдется target в аргументе z_Folder
-            if (loggingLevel3) {
+            if (loggingLevel1) {
                 System.out.println("currentPath был пустой. nextStep взяли findBestDetour(): " + nextStep);
                 System.out.println("и положили nextStep в currentPath");
             }
@@ -143,7 +147,7 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("calling next step = z_Folder(nextStep:" + nextStep + ")");
             }
             Point target = this.currentPath.get(currentPath.size() - 1);
-            nextStep = z_Folder(nextStep, target, modeParams.proximity, modeParams.leftEndpoint, modeParams.rightEndpoint);
+            nextStep = z_Folder(nextStep, target, modeParams.proximity, modeParams.headToAppleProximity, modeParams.swingWidth);
             if (loggingLevel1) {
                 System.out.println("змея длиннее чем smallEndPoint");
                 System.out.println("nextStep from z_Folder: " + nextStep);
@@ -156,7 +160,7 @@ public class YourSolver implements Solver<Board> {
     }
 
 
-    public Point z_Folder(Point nextStepFromCurrentPath, Point target, int proximity, int leftEndpoint, int rightEndpoint) {
+    public Point z_Folder(Point nextStepFromCurrentPath, Point target, int proximity, int headToAppleProximity, int swingWidgh) {
         System.out.println("in z_Folder(nextStepFromCurrentPath:" + nextStepFromCurrentPath + ", target: " + target);
         Point head = board.getHead();
         Point nextStep = null;
@@ -185,6 +189,8 @@ public class YourSolver implements Solver<Board> {
         boolean foldToRightIsAllowed = false;
         boolean targetIsReachableFromLeft = checkLeftOrRightTraverse(left, target);
         boolean targetIsReachableFromRight = checkLeftOrRightTraverse(right, target);
+        int leftLimit = 3;
+        int rightLimit = 10;
 
         if (probeToLeft > probeToRight && targetIsReachableFromLeft) {
             foldToLeftIsAllowed = true;
@@ -198,6 +204,15 @@ public class YourSolver implements Solver<Board> {
             System.out.println("-> both: foldToLeftIsAllowed and foldToRightIsAllowed = true ");
         }
 
+        //отправная точка начала складывания в змеевик:
+        if (target.getX() <= head.getX() && prevousMovementDirection == null) {
+            movementToLeftAllowed = true;
+        } else {
+            if (target.getX() > head.getX() && prevousMovementDirection == null)
+                movementToRightAllowed = true;
+        }
+
+
         // если унюхали поблизости яблоко -хватаем его!
 //proximity- длина "нюха" по оси Y: прямой ход по Дейкстре разрешен без скрутки в змеевик, пока Y более proximity
         int deltaY = Math.abs(head.getY() - target.getY());
@@ -205,6 +220,8 @@ public class YourSolver implements Solver<Board> {
         //headToAppleProximity - расстояние "нюха" до яблока (до длины 60 оно =2, для более 60ти оно =1
         boolean headIsVeryCloseToApple = deltaY <= headToAppleProximity;
 
+
+        // сначала проверяется режим "прямого хода по Дейкстре:
         if (
                 deltaY > proximity  //proximity -это расстояние от яблока к голове, на котором уже скручиваемся в змеевик
                         || badAppleIsNear //ни дай Бог рядом камень - может произойти сбой, поэтому не дуркуем и идем по маршруту!
@@ -218,12 +235,17 @@ public class YourSolver implements Solver<Board> {
                 System.out.println("headIsVeryCloseToApple: " + headIsVeryCloseToApple);
                 System.out.println("не совпал proximity -> suggestedNextStep: " + nextStep);
             }
+
+            resetZ_foldingParameters();
+
+
         } else //иначе проверяем
             // складываем змейку в змеевик
 
 
+            // --------------блок складывания змеевика влево-------------------
             if (board.isAt(head.getX() - 1, head.getY(), Elements.NONE, Elements.GOOD_APPLE)
-                    && head.getX() > leftEndpoint
+                    && head.getX() >= leftLimit
 
                     &&
                     //и обязательно, чтобы были свободны козырьки сверху либо снизу
@@ -244,13 +266,34 @@ public class YourSolver implements Solver<Board> {
                             head.getY() < target.getY())
 
                     && foldToLeftIsAllowed
+                    && movementToLeftAllowed
             ) {
-                nextStep = new PointImpl(head.getX() - 1, head.getY());
-                if (loggingLevel1) {
-                    System.out.println("складываем змеевик- один шаг влево: " + nextStep);
+                //TODO здесь начало движения шагов влево
+                if (prevousMovementDirection == null) {
+                    prevousMovementDirection = LEFT;
+                    movementToRightAllowed = false;
                 }
+
+                if (prevousMovementDirection == LEFT) {
+
+//-----------------------
+                    stepCounter++;
+                    if (stepCounter >= swingWidgh) {
+                        prevousMovementDirection = null;
+                        movementToLeftAllowed = false;
+                    }
+//-----------------------
+                    nextStep = new PointImpl(head.getX() - 1, head.getY());
+                    if (loggingLevel1) {
+                        System.out.println("складываем змеевик- один шаг влево: " + nextStep);
+                    }
+
+                }
+
+
+                // --------------блок складывания змеевика вправо-------------------
             } else if (board.isAt(head.getX() + 1, head.getY(), Elements.NONE, Elements.GOOD_APPLE)
-                    && head.getX() < rightEndpoint
+                    && head.getX() <= rightLimit
 
 
                     &&
@@ -271,13 +314,34 @@ public class YourSolver implements Solver<Board> {
                             &&
                             head.getY() < target.getY())
                     && foldToRightIsAllowed
+                    && movementToRightAllowed
 
             ) {
-                nextStep = new PointImpl(head.getX() + 1, head.getY());
-                if (loggingLevel1) {
-                    System.out.println("складываем змеевик- один шаг вправо: " + nextStep);
+                //TODO здесь начало движения шагов вправо
+                if (prevousMovementDirection == null) {
+                    prevousMovementDirection = RIGHT;
+                    movementToLeftAllowed = false;
                 }
+
+                if (prevousMovementDirection == RIGHT) {
+
+//-----------------------
+                    stepCounter++;
+                    if (stepCounter >= swingWidgh) {
+                        prevousMovementDirection = null;
+                        movementToRightAllowed = false;
+                    }
+//-----------------------
+                    nextStep = new PointImpl(head.getX() + 1, head.getY());
+                    if (loggingLevel1) {
+                        System.out.println("складываем змеевик- один шаг вправо: " + nextStep);
+                    }
+                }
+
+
             } else {
+
+                resetZ_foldingParameters();
                 nextStep = nextStepFromCurrentPath;
                 if (loggingLevel1) {
                     System.out.println("-> почему-то не смогли сложить в змеевик- устанавливаем nextStep: " + nextStep);
@@ -291,8 +355,15 @@ public class YourSolver implements Solver<Board> {
         return nextStep;
     }
 
+    public void resetZ_foldingParameters() {
+        //и держим обнулёнными все параметры складывания в змеевик
+        prevousMovementDirection = null;
+        stepCounter = 0;
+        movementToLeftAllowed = movementToRightAllowed = false;
+    }
+
     public Point findBestDetour(Point from) {// метод может вернуть null
-        if (loggingLevel3) {
+        if (loggingLevel1) {
             System.out.println("in findBestDetour");
         }
         // сюда отправляем nextStep в случаях, когда никакие пути не найдены или являются опасными
@@ -347,8 +418,10 @@ public class YourSolver implements Solver<Board> {
         List<Point> probedPathToTarget = Dijkstra.buildPath(toVertex);
 
         if (!probedPathToTarget.isEmpty()) {
-            System.out.println("FOUND a path from probedPoint " + from + " to target: " + to);
-            System.out.println("quitting from checkLeftOrRightTraverse");
+            if (loggingLevel1) {
+                System.out.println("FOUND a path from probedPoint " + from + " to target: " + to);
+                System.out.println("quitting from checkLeftOrRightTraverse");
+            }
             return true;
         } else {
             System.out.println("NOT found a path from probedPoint " + from + " to target: " + to);
@@ -487,16 +560,13 @@ public class YourSolver implements Solver<Board> {
         //большой змеи, когда она начинает скручиваться в змеевик и включается getStickyDirection()
 
         //ниже задаются эндпоинты для длин змеи, при которых переключаются режимы работы алгоритма скручивания в змеевик:
-        int youngStartingPoint = 30;
+        int youngStartingPoint = 2;
         int mediumStartPoint = 40;
         int largeStartPoint = 55;
-        /* расстояние прямого подхода головы к яблоку перед началом скручивания. Если 0, то скручивается еще на дальнем расстоянии от яблока
-        Голова подойдет к яблоку на расстояние proximity, потом начнет скручиваться в змеевик.
-        Можно это перевернуть, изменив знак на "head<target как здесь: if (Math.abs(head.getY() - target.getY()) < proximity
-        Тогда proximity будет означать что голова сначала скрутится, а потом бросится к яблоку с расстояния proximity.*/
+        int headToAppleProximity = 2;
+
         int proximity = 0;//proximity -это расстояние от яблока к голове, на котором уже скручиваемся в змеевик
-        int leftEndpoint = 1;//левая граница скручивания
-        int rightEndpoint = this.board.size() - 1; //правая граница скручивания
+        int swingWidth = 0;
 
         if (snakeLength >= youngStartingPoint/*25*/
                 && snakeLength < mediumStartPoint) {
@@ -505,8 +575,8 @@ public class YourSolver implements Solver<Board> {
             }
             snakeSmall = false;
             proximity = 7;
-            leftEndpoint = 6;
-            rightEndpoint = this.board.size() - 6;
+            swingWidth = 3;
+            headToAppleProximity = 3;
         }
 
         if (snakeLength >= mediumStartPoint/*35*/
@@ -516,8 +586,8 @@ public class YourSolver implements Solver<Board> {
             }
             snakeSmall = false;
             proximity = 7;
-            leftEndpoint = 5;
-            rightEndpoint = this.board.size() - 6;
+            swingWidth = 6;
+            headToAppleProximity = 2;
         }
         if (snakeLength >= largeStartPoint/*45*/) {
             if (loggingLevel1) {
@@ -525,13 +595,13 @@ public class YourSolver implements Solver<Board> {
             }
             snakeSmall = false;
             proximity = 10;
-            leftEndpoint = 3;
-            rightEndpoint = this.board.size() - 4;
+            swingWidth = 9;
+            headToAppleProximity = 1;
         }
         if (false) {
-            System.out.println("leftEndpoint: " + leftEndpoint + ",  rightEndpoint: " + rightEndpoint);
+            System.out.println("swingWidth: " + swingWidth);
         }
-        return new YourSolver.SnakeParams(snakeSmall, proximity, leftEndpoint, rightEndpoint);
+        return new YourSolver.SnakeParams(snakeSmall, proximity, headToAppleProximity, swingWidth);
     }
 
     public void setVariables() {
@@ -544,24 +614,23 @@ public class YourSolver implements Solver<Board> {
 //        arrangedSnake.addAll(arrangeSnake(snake));
         this.tail = this.board.get(Elements.TAIL_END_DOWN, Elements.TAIL_END_UP, Elements.TAIL_END_LEFT, Elements.TAIL_END_RIGHT).get(0);
 
-        tailToHeadDistanceIsVeryMinimum =
-                head.distance(tail) >= headToTailMinimumAllowedDistance
-                        && head.distance(tail) < headToTailGoodDistance;
+        try {
+            tailToHeadDistanceIsVeryMinimum =
+                    head.distance(tail) >= headToTailMinimumAllowedDistance
+                            && head.distance(tail) < headToTailGoodDistance;
 
-        tailToHeadDistanceIsOkay = head.distance(tail) >= headToTailGoodDistance;
+            tailToHeadDistanceIsOkay = head.distance(tail) >= headToTailGoodDistance;
 
-        if (snake.size() > 60) {
-            headToAppleProximity = 2;
+            appleTailStonePathsNotFound = pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty();
+        } catch (Exception e) {
+            System.out.println("headNotFoundException");
         }
-
-        appleTailStonePathsNotFound = pathToApple.isEmpty() && pathToStone.isEmpty() && pathToTail.isEmpty();
-
 
         if (loggingLevel1) {
             System.out.println("tail: " + this.tail);
         }
 
-        if (loggingLevel3) {
+        if (loggingLevel1) {
             System.out.println("snake.size(): " + this.snake.size());
         }
 
@@ -600,7 +669,9 @@ public class YourSolver implements Solver<Board> {
     }
 
     public void choosePath() {
-        System.out.println("in choosePath()");
+        if (loggingLevel1) {
+            System.out.println("in choosePath()");
+        }
 // если змея опасно-громадная:
         if (snake.size() > maximumAllowedSnakeSize) {
             if (!pathToApple.isEmpty()
@@ -655,9 +726,11 @@ public class YourSolver implements Solver<Board> {
             } else if (!pathToApple.isEmpty()) { //и, в самом ХОРОШЕМ случае, думаем  идти ли нам на на яблоко
                 decideIfWeGoToApple();//метод проверяет есть ли вокруг яблока достаточно места и решает, может пойти на хвост или на камень
             }
+        if (loggingLevel1) {
+            System.out.println("quitting choosePath()");
+        }
         if (loggingLevel3) {
             System.out.println("chosen currentPath: " + chosenPath);
-            System.out.println("quitting choosePath()");
         }
 
     }
@@ -722,7 +795,9 @@ public class YourSolver implements Solver<Board> {
         Dijkstra.Vertex appleV = getTargetFromGraph(graphApple, apple);
         Set<Dijkstra.Vertex> visited = new HashSet<>();
         freeSpaceAroundApple = countSpaceAround(appleV, visited);
-        System.out.println("in decideIfWeGoToApple -> freeSpaceAroundApple: " + freeSpaceAroundApple);
+        if (loggingLevel1) {
+            System.out.println("in decideIfWeGoToApple -> freeSpaceAroundApple: " + freeSpaceAroundApple);
+        }
         if (freeSpaceAroundApple >= minimumReqAmntOfStepsAroundThePoint) {
             if (loggingLevel1) {
                 System.out.println("path to apple found, freeSpaceAround >= requiredVertexMinimum\n heading to: apple");
@@ -754,7 +829,7 @@ public class YourSolver implements Solver<Board> {
         if (loggingLevel1) {
             System.out.println("in forwardToDetourOrStone");
         }
-        if (findBestDetour(head)!=null) {
+        if (findBestDetour(head) != null) {
             if (loggingLevel1) {
                 System.out.println("heading to detour");
             }
@@ -772,7 +847,9 @@ public class YourSolver implements Solver<Board> {
 
     public String convertNextStepToDirection(Point nextStep) {
         // метод работает как часы! Я сверял.
-        System.out.println("in  convertNextStepToDirection(" + nextStep + ')');
+        if (loggingLevel1) {
+            System.out.println("in  convertNextStepToDirection(" + nextStep + ')');
+        }
 
         Point head = this.board.getHead();
         String dir = null;
@@ -780,11 +857,11 @@ public class YourSolver implements Solver<Board> {
         if (nextStep.getX() > head.getX()
                 && nextStep.getY() == head.getY()
         ) {
-            dir = Direction.RIGHT.toString();
+            dir = RIGHT.toString();
         } else if (nextStep.getX() < head.getX()
                 && nextStep.getY() == head.getY()
         ) {
-            dir = Direction.LEFT.toString();
+            dir = LEFT.toString();
         } else if (nextStep.getY() > head.getY()
                 && nextStep.getX() == head.getX()
         ) {
@@ -978,14 +1055,14 @@ public class YourSolver implements Solver<Board> {
         boolean snakeSmall;
         // ограничители скручивания змейки в змеевик в зависимости от длины змейки snakeLength (snakeSize)
         int proximity;
-        int leftEndpoint;
-        int rightEndpoint;
+        int swingWidth;
+        int headToAppleProximity;
 
-        public SnakeParams(boolean snakeSmall, int proximity, int leftEndpoint, int rightEndpoint) {
+        public SnakeParams(boolean snakeSmall, int proximity, int headToAppleProximity, int swingWidth) {
             this.snakeSmall = snakeSmall;
             this.proximity = proximity;
-            this.leftEndpoint = leftEndpoint;
-            this.rightEndpoint = rightEndpoint;
+            this.swingWidth = swingWidth;
+            this.headToAppleProximity = headToAppleProximity;
         }
 
     }

@@ -68,7 +68,7 @@ public class Dijkstra {
 
         @Override
         public String toString() {
-            return "edge-> ( point: " + this.v.point.toString() + ", weight: " + this.weight + ')';
+            return "edge-> ( LeadsTo: " + this.v.point.toString() + ", weight: " + this.weight + ')';
         }
 
 
@@ -89,7 +89,7 @@ public class Dijkstra {
 
     }
 
-    public static void computeGraph(Vertex source, Point to) {
+    public static void computeGraph(Vertex source) {
            PriorityQueue<Vertex> q = new PriorityQueue<>();
         source.minWeight = 0;
         q.offer(source);
